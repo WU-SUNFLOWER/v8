@@ -25,7 +25,6 @@
 .*.sw?
 .cache
 .ccls-cache
-.clangd
 .cpplint-cache
 .cproject
 .DS_Store
