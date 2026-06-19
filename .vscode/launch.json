@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "d8.exe",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/Default/d8.exe",
+            "args": [
+                //"--trace-ignition",
+                "--allow-natives-syntax",
+                "--print-bytecode",
+                "../../learn_v8/demo-string.js"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/out/Default",
+            "environment": [],
+            "console": "externalTerminal"
+        }
+    ]
+}

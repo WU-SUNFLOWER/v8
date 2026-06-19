@@ -1,0 +1,22 @@
+{
+    "clangd.arguments": [
+      "--background-index",
+      "--completion-style=detailed",
+      "--header-insertion=never",
+      "--compile-commands-dir=E:/MyProject/v8/v8",
+      "--query-driver=E:/MyProject/v8/v8/third_party/llvm-build/Release+Asserts/bin/clang-cl.exe"
+    ],
+  
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.autocomplete": "disabled",
+  
+    "search.exclude": {
+      "**/out/**": true,
+      "**/.git/**": true
+    },
+  
+    "files.watcherExclude": {
+      "**/out/**": true,
+      "**/.git/**": true
+    }
+  }
