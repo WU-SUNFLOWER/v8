@@ -186,41 +186,46 @@ RUNTIME_FUNCTION(Runtime_DeclareGlobals) {
 
   // Traverse the name/value pairs and set the properties.
   int length = declarations->length();
-  FOR_WITH_HANDLE_SCOPE(isolate, int, i = 0, i, i < length, i++, {
-    Handle<Object> decl(declarations->get(i), isolate);
-    Handle<String> name;
-    Handle<Object> value;
-    bool is_var = IsString(*decl);
-
-    if (is_var) {
-      name = Handle<String>::cast(decl);
-      value = isolate->factory()->undefined_value();
-    } else {
-      Handle<SharedFunctionInfo> sfi = Handle<SharedFunctionInfo>::cast(decl);
-      name = handle(sfi->Name(), isolate);
-      int index = Smi::ToInt(declarations->get(++i));
-      Handle<FeedbackCell> feedback_cell(
-          closure_feedback_cell_array->get(index), isolate);
-      value = Factory::JSFunctionBuilder(isolate, sfi, context)
-                  .set_feedback_cell(feedback_cell)
-                  .Build();
+  do {
+    int i = 0;
+    int for_with_handle_limit = i;
+    Isolate* for_with_handle_isolate = isolate;
+    while (i < length) {
+      for_with_handle_limit += 1024;
+      HandleScope loop_scope(for_with_handle_isolate);
+      for (; i < length && i < for_with_handle_limit; i++) {
+        {
+          Handle<Object> decl(declarations->get(i), isolate);
+          Handle<String> name;
+          Handle<Object> value;
+          bool is_var = IsString(*decl);
+          if (is_var) {
+            name = Handle<String>::cast(decl);
+            value = isolate->factory()->undefined_value();
+          } else {
+            Handle<SharedFunctionInfo> sfi =
+                Handle<SharedFunctionInfo>::cast(decl);
+            name = handle(sfi->Name(), isolate);
+            int index = Smi ::ToInt(declarations->get(++i));
+            Handle<FeedbackCell> feedback_cell(
+                closure_feedback_cell_array->get(index), isolate);
+            value = Factory ::JSFunctionBuilder(isolate, sfi, context)
+                        .set_feedback_cell(feedback_cell)
+                        .Build();
+          }
+          Tagged<Script> script = Script ::cast(closure->shared()->script());
+          PropertyAttributes attr =
+              script->compilation_type() == Script ::CompilationType ::kEval
+                  ? NONE
+                  : DONT_DELETE;
+          Tagged<Object> result =
+              DeclareGlobal(isolate, global, name, value, attr, is_var,
+                            RedeclarationType ::kSyntaxError);
+          if (isolate->has_pending_exception()) return result;
+        }
+      }
     }
-
-    // Compute the property attributes. According to ECMA-262,
-    // the property must be non-configurable except in eval.
-    Tagged<Script> script = Script::cast(closure->shared()->script());
-    PropertyAttributes attr =
-        script->compilation_type() == Script::CompilationType::kEval
-            ? NONE
-            : DONT_DELETE;
-
-    // ES#sec-globaldeclarationinstantiation 5.d:
-    // If hasRestrictedGlobal is true, throw a SyntaxError exception.
-    Tagged<Object> result =
-        DeclareGlobal(isolate, global, name, value, attr, is_var,
-                      RedeclarationType::kSyntaxError);
-    if (isolate->has_pending_exception()) return result;
-  });
+  } while (false);
 
   return ReadOnlyRoots(isolate).undefined_value();
 }
@@ -533,7 +538,6 @@ RUNTIME_FUNCTION(Runtime_NewStrictArguments) {
   return *result;
 }
 
-
 RUNTIME_FUNCTION(Runtime_NewRestParameter) {
   HandleScope scope(isolate);
   DCHECK_EQ(1, args.length());
@@ -627,7 +631,6 @@ RUNTIME_FUNCTION(Runtime_PushBlockContext) {
   return *isolate->factory()->NewBlockContext(current, scope_info);
 }
 
-
 RUNTIME_FUNCTION(Runtime_DeleteLookupSlot) {
   HandleScope scope(isolate);
   DCHECK_EQ(1, args.length());
@@ -663,7 +666,6 @@ RUNTIME_FUNCTION(Runtime_DeleteLookupSlot) {
   MAYBE_RETURN(result, ReadOnlyRoots(isolate).exception());
   return isolate->heap()->ToBoolean(result.FromJust());
 }
-
 
 namespace {
 
@@ -733,7 +735,6 @@ MaybeHandle<Object> LoadLookupSlot(Isolate* isolate, Handle<String> name,
 
 }  // namespace
 
-
 RUNTIME_FUNCTION(Runtime_LoadLookupSlot) {
   HandleScope scope(isolate);
   DCHECK_EQ(1, args.length());
@@ -742,14 +743,12 @@ RUNTIME_FUNCTION(Runtime_LoadLookupSlot) {
                            LoadLookupSlot(isolate, name, kThrowOnError));
 }
 
-
 RUNTIME_FUNCTION(Runtime_LoadLookupSlotInsideTypeof) {
   HandleScope scope(isolate);
   DCHECK_EQ(1, args.length());
   Handle<String> name = args.at<String>(0);
   RETURN_RESULT_OR_FAILURE(isolate, LoadLookupSlot(isolate, name, kDontThrow));
 }
-
 
 RUNTIME_FUNCTION_RETURN_PAIR(Runtime_LoadLookupSlotForCall) {
   HandleScope scope(isolate);
@@ -851,7 +850,6 @@ MaybeHandle<Object> StoreLookupSlot(
 }
 
 }  // namespace
-
 
 RUNTIME_FUNCTION(Runtime_StoreLookupSlot_Sloppy) {
   HandleScope scope(isolate);
