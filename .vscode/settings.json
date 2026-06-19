@@ -18,5 +18,7 @@
     "files.watcherExclude": {
       "**/out/**": true,
       "**/.git/**": true
-    }
+    },
+
+    "editor.formatOnSave": true
   }
