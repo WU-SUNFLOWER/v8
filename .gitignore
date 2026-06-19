@@ -116,3 +116,5 @@ bazel-bin
 bazel-out
 bazel-testlogs
 bazel-v8
+
+.vs
