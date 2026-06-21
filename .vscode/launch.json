@@ -16,6 +16,17 @@
             "cwd": "${workspaceFolder}/out/Default",
             "environment": [],
             "console": "externalTerminal"
+        },
+        {
+            "name": "mksnapshot.exe",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/Default/mksnapshot.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/out/Default",
+            "environment": [],
+            "console": "externalTerminal"
         }
     ]
 }
