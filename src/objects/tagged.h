@@ -73,6 +73,8 @@ template <>
 struct is_subtype<TaggedIndex, Object> : public std::true_type {};
 template <>
 struct is_subtype<FieldType, Object> : public std::true_type {};
+// 只要 T 在 C++ 继承上是 HeapObject 的派生类（ std::is_base_of_v<HeapObject, T>
+// == true ），那么就强行认为 is_subtype<T, Object>::value == true 。
 template <typename Base>
 struct is_subtype<Base, Object,
                   std::enable_if_t<std::is_base_of_v<HeapObject, Base>>>
