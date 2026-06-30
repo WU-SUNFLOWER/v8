@@ -84,14 +84,24 @@ class TypeInfo;
 
 // Order of kinds is significant.
 // Must fit in the BitField PropertyDetails::KindField.
+// kData =>
+//   普通对象属性，例如obj.x = 123
+// kAccessor =>
+//   访问器属性，例如通过Object.defineProperty以getter/setter形式定义的属性
 enum class PropertyKind { kData = 0, kAccessor = 1 };
 
 // Order of modes is significant.
 // Must fit in the BitField PropertyDetails::LocationField.
+// kField =>
+//   属性内联在对象本体（即in-object field）中，或存放在properties
+//   backing store 中 kDescriptor =>
+// kDescriptor =>
+//   属性信息直接存放在descriptor里，例如访问器属性
 enum class PropertyLocation { kField = 0, kDescriptor = 1 };
 
 // Order of modes is significant.
 // Must fit in the BitField PropertyDetails::ConstnessField.
+// 这个属性在 V8 看来，后续值是否允许变化 / 是否可当成稳定常量处理？
 enum class PropertyConstness { kMutable = 0, kConst = 1 };
 
 class Representation {
