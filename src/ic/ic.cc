@@ -1765,6 +1765,20 @@ MaybeHandle<Object> StoreIC::Store(Handle<Object> object, Handle<Name> name,
 
   JSObject::MakePrototypesFast(object, kStartAtPrototype, isolate());
   PropertyKey key(isolate(), name);
+  // 执行普通的 JavaScript 属性赋值操作（例如`obj.k = v`）时，
+  // IsAnyDefineOwn() == false
+  // 为什么IsAnyDefineOwn() == false时，
+  // 采用的属性查找模式是LookupIterator::DEFAULT（会遍历原型链）
+  // 而不是LookupIterator::OWN（仅查目标对象自身）呢？
+  // 下面的例子可以说明这个问题：
+  // let o1 = {};
+  // Object.defineProperty(o1, 'y', {
+  //   get() { return 233; },
+  //   set() { console.log("y setter"); },
+  // });
+  // let o2 = {x: 1, __proto__: o1};
+  // o2.y = 2;  // => y setter
+  // console.log(o2.y);  // => 233
   LookupIterator it(
       isolate(), object, key,
       IsAnyDefineOwn() ? LookupIterator::OWN : LookupIterator::DEFAULT);
