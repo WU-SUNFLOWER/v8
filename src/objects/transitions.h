@@ -243,6 +243,10 @@ class V8_EXPORT_PRIVATE TransitionsAccessor {
 // [3] First transition target (weak ref)
 // ...
 // [2 + number of transitions * kEntrySize]: start of slack
+///////////////////////////////////////////////////////////////////////////////
+// prototype transitions是一个额外的小缓存，用来记住：
+// 如果持有当前 map 的对象的 __proto__
+// 被切换为另一个对象，之前有没有已经创建过对应的新 map ？
 class TransitionArray : public WeakFixedArray {
  public:
   DECL_CAST(TransitionArray)
