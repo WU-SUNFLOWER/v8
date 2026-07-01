@@ -992,8 +992,11 @@ class Map : public TorqueGeneratedMap<Map, HeapObject> {
   DECL_RELEASE_SETTER(instance_descriptors, Tagged<DescriptorArray>)
 
   // Hide inherited accessors from the generated superclass.
-  DECL_ACCESSORS(constructor_or_back_pointer_or_native_context, Tagged<Object>)
-  DECL_ACCESSORS(transitions_or_prototype_info, Tagged<Object>)
+  // 不要把这两个方法隐藏成private，便于学习调试
+  // DECL_ACCESSORS(constructor_or_back_pointer_or_native_context,
+  // Tagged<Object>);
+  // DECL_ACCESSORS(transitions_or_prototype_info,
+  // Tagged<Object>);
 
   friend class MapUpdater;
   template <typename ConcreteVisitor>
