@@ -237,13 +237,12 @@ class V8_EXPORT_PRIVATE TransitionsAccessor {
 // The TransitionArray class exposes a very low-level interface. Most clients
 // should use TransitionsAccessors.
 // TransitionArrays have the following format:
-// [0] Link to next TransitionArray (for weak handling support) (strong ref)
-// [1] Tagged<Smi>(0) or WeakFixedArray of prototype transitions (strong ref)
-// [2] Number of transitions (can be zero after trimming)
-// [3] First transition key (strong ref)
-// [4] First transition target (weak ref)
+// [0] Tagged<Smi>(0) or WeakFixedArray of prototype transitions (strong ref)
+// [1] Number of transitions (can be zero after trimming)
+// [2] First transition key (strong ref)
+// [3] First transition target (weak ref)
 // ...
-// [3 + number of transitions * kTransitionSize]: start of slack
+// [2 + number of transitions * kEntrySize]: start of slack
 class TransitionArray : public WeakFixedArray {
  public:
   DECL_CAST(TransitionArray)
