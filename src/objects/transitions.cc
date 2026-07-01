@@ -47,6 +47,7 @@ void TransitionsAccessor::Insert(Isolate* isolate, Handle<Map> map,
 
   // If the map doesn't have any transitions at all yet, install the new one.
   if (encoding == kUninitialized || encoding == kMigrationTarget) {
+    // 直接将transitions槽位指向子Map（弱引用），不额外创建TransitionArray
     if (flag == SIMPLE_PROPERTY_TRANSITION) {
       ReplaceTransitions(isolate, map, HeapObjectReference::Weak(*target));
       return;
@@ -60,6 +61,7 @@ void TransitionsAccessor::Insert(Isolate* isolate, Handle<Map> map,
     return;
   }
 
+  // 如果map的transitions槽位中存的是一个弱引用
   if (encoding == kWeakRef) {
     Tagged<Map> simple_transition = GetSimpleTransition(isolate, map);
     DCHECK(!simple_transition.is_null());
@@ -69,6 +71,7 @@ void TransitionsAccessor::Insert(Isolate* isolate, Handle<Map> map,
       PropertyDetails old_details =
           simple_transition->GetLastDescriptorDetails(isolate);
       PropertyDetails new_details = GetTargetDetails(*name, *target);
+      // 如果新写入的属性与原有迁移记录重名、且details和attributes，那么直接修改父map对象中transitions槽位的指向
       if (key->Equals(*name) && old_details.kind() == new_details.kind() &&
           old_details.attributes() == new_details.attributes()) {
         ReplaceTransitions(isolate, map, HeapObjectReference::Weak(*target));
