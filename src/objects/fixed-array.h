@@ -412,6 +412,17 @@ class WeakFixedArrayShape final : public AllStatic {
 };
 
 // WeakFixedArray describes fixed-sized arrays with element type MaybeObject.
+// WeakFixedArray的内存布局（定义在WeakFixedArrayShape当中）：
+// +------------------------------------------------------+
+// | HeapObject header                                    |
+// |   map pointer                                        |
+// +------------------------------------------------------+
+// | Array header                                         |
+// |   length/capacity  (at kCapacityOffset)              |
+// |   padding/alignment if needed                        |
+// +------------------------------------------------------+
+// | Element slots ...                                    |
+// +------------------------------------------------------+
 class WeakFixedArray
     : public TaggedArrayBase<WeakFixedArray, WeakFixedArrayShape> {
   using Super = TaggedArrayBase<WeakFixedArray, WeakFixedArrayShape>;
