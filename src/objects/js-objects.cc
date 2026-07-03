@@ -3183,6 +3183,7 @@ void MigrateFastToFast(Isolate* isolate, Handle<JSObject> object,
     // Check if we still have space in the {object}, in which case we
     // can also simply set the map (modulo a special case for mutable
     // double boxes).
+    // 如果属性能内联进对象本体，或者 PropertyArray 还有空间，则不用扩容
     FieldIndex index = FieldIndex::ForDetails(*new_map, details);
     if (index.is_inobject() || index.outobject_array_index() <
                                    object->property_array(isolate)->length()) {
@@ -3197,6 +3198,10 @@ void MigrateFastToFast(Isolate* isolate, Handle<JSObject> object,
 
     // This migration is a transition from a map that has run out of property
     // space. Extend the backing store.
+    // `new_map->UnusedPropertyFields()`
+    //   => 迁移完成（即扩容完成）后该 JavaScript 还需要预留多少个空槽位(slack)
+    // `+ 1`
+    //   => 至少需要扩容 1 个槽位，用于存放当前新增的属性值
     int grow_by = new_map->UnusedPropertyFields() + 1;
     Handle<PropertyArray> old_storage(object->property_array(isolate), isolate);
     Handle<PropertyArray> new_storage =
