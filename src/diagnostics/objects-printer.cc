@@ -3492,8 +3492,8 @@ void TransitionsAccessor::PrintTransitions(std::ostream& os) {
 
 void TransitionsAccessor::PrintTransitionTree() {
   StdoutStream os;
-  os << "map= " << Brief(map_);
   DisallowGarbageCollection no_gc;
+  os << "map= " << Brief(map_);
   PrintTransitionTree(os, 0, &no_gc);
   os << "\n" << std::flush;
 }
@@ -3537,6 +3537,11 @@ void TransitionsAccessor::PrintTransitionTree(
       descriptors->PrintDescriptorDetails(os, descriptor,
                                           PropertyDetails::kForTransitions);
     }
+
+    os << std::endl;
+    target->MapPrint(os);
+    os << std::endl;
+
     TransitionsAccessor transitions(isolate_, target);
     transitions.PrintTransitionTree(os, level + 1, no_gc);
   }
