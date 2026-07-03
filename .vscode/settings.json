@@ -3,7 +3,7 @@
     "--background-index",
     "--completion-style=detailed",
     "--header-insertion=never",
-    "--compile-commands-dir=${workspaceFolder}",
+    "--compile-commands-dir=${workspaceFolder}/out/Default",
     "--query-driver=${workspaceFolder}/third_party/llvm-build/Release+Asserts/bin/clang-cl.exe"
   ],
   "C_Cpp.intelliSenseEngine": "disabled",
@@ -16,5 +16,11 @@
     "**/out/**": true,
     "**/.git/**": true
   },
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "[javascript]": {
+    "editor.formatOnSave": false
+  },
+  "files.associations": {
+    "*.inc": "cpp" // 将 .inc 文件关联到 C++ 语言模式
+  }
 }
