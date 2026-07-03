@@ -1231,6 +1231,7 @@ RUNTIME_FUNCTION(Runtime_TakeHeapSnapshot) {
 }
 
 static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os) {
+  DisallowGarbageCollection no_gc;
   if (maybe_object->IsCleared()) {
     os << "[weak cleared]";
   } else {
@@ -1242,7 +1243,19 @@ static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os) {
     if (weak) os << "[weak] ";
     Print(object, os);
     if (IsHeapObject(object)) {
+      // 打印堆上对象指向的 Map 对象
       Print(HeapObject::cast(object)->map(), os);
+      // 如果该堆上对象是一个 JSObject，尝试打印它的 PropertyArray
+      if (IsJSObject(object)) {
+        Tagged<JSObject> js_object = JSObject::cast(object);
+        if (js_object->HasFastProperties()) {
+          Tagged<PropertyArray> props = js_object->property_array();
+          os << "====Start PropertyArray of JSObject 0x" << std::hex
+             << std::uppercase << js_object.ptr() << "====\n";
+          Print(props, os);
+          os << "====End PropertyArray of JSObject====\n";
+        }
+      }
     }
 #else
     if (weak) os << "[weak] ";
