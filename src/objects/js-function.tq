@@ -37,6 +37,22 @@ extern class JSFunction extends JSFunctionOrBoundFunctionOrWrappedFunction {
   context: Context;
   feedback_cell: FeedbackCell;
   // Space for the following field may or may not be allocated.
+  // prototype_or_initial_map可能指向一个JavaScript原型对象，也有可能指向一个供new出来的对象指向的Map对象。
+  // 例子：
+  // ```JavaScript
+  // function Person(name) {
+  //   this.name = name;
+  // }
+  // // 这里发生 “SetPrototype/SetInstancePrototype” 逻辑
+  // // => prototype_or_initial_map 先指向这个 Person.prototype 对象
+  // Person.prototype = {
+  //   sayHi() { return `hi ${this.name}`; }
+  // };
+  // // 这里会触发 EnsureHasInitialMap 创建 initial_map
+  // // => prototype_or_initial_map 指向创建出来的 initial_map 对象
+  // // => initial_map 对象的 prototype 字段指向 Person.prototype 对象
+  // const p = new Person("A");
+  // ```
   prototype_or_initial_map: JSReceiver|Map;
 }
 
