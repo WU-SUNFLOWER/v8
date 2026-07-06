@@ -166,6 +166,8 @@ class Representation {
     return true;
   }
 
+  // 如果我要把某个字段的 Representation 从旧表示改成新表示，
+  // 能不能只改 Map/Descriptor 元数据，不需要更新现有对象实例？
   bool CanBeInPlaceChangedTo(const Representation& other) const {
     if (Equals(other)) return true;
     if (IsWasmValue() || other.IsWasmValue()) return false;
@@ -174,8 +176,35 @@ class Representation {
     // but double without any modification to the object, because the default
     // uninitialized value for representation None can be overwritten by both
     // smi and tagged values. Doubles, however, would require a box allocation.
+    // None 表示这个字段目前还是“未初始化槽位”，V8规定：
+    // - None -> Smi 可以
+    // - None -> Tagged 可以
+    // - None -> HeapObject 可以
+    // - None -> Double 不可以
+    // 原因在于：
+    // - 对 None 来说，默认未初始化值可以被后续的 Smi 或 Tagged 值直接覆盖
+    // - 但如果要变成 Double ，就不是简单“覆盖”了，可能需要额外的
+    //   box allocation，因此不能认为只需要更新一下字段的
+    //   Representation元数据就完事了。
     if (IsNone()) return !other.IsDouble();
+    // 这句的含义是：
+    // - 一旦字段已经不是 None
+    // - 之后如果还想原地改表示
+    // - 唯一允许的目标基本就是 Tagged
+    // 换句话说：
+    // - Smi -> Tagged 可以原地改
+    // - Double -> Tagged 可以原地改
+    // - HeapObject -> Tagged 可以原地改
+    // - Smi -> Double 不行
+    // - HeapObject -> Double 不行
+    // - Double -> HeapObject 不行
+    // 因为 Tagged 是最宽泛、最“兜底”的字段值表示。
+    // 把一个更窄的表示放宽成Tagged，通常可以只放宽元数据约束，而需要变形现有对象。
     if (!other.IsTagged()) return false;
+    // 这个断言蕴含：
+    // Smi        -> Tagged     allowed in-place
+    // Double     -> Tagged     allowed in-place
+    // HeapObject -> Tagged     allowed in-place
     DCHECK(IsSmi() || IsDouble() || IsHeapObject());
     return true;
   }
@@ -188,19 +217,55 @@ class Representation {
     return Representation::Tagged();
   }
 
+  // 当前Representation是否比other更加通用？
+  //
+  // `if (IsHeapObject()) return other.IsNone();`：
+  // - 如果当前表示是 HeapObject ，它只认为自己比 None 更通用。
+  // - 即HeapObject不被当作一个正常线性序里的“比Smi/Double更一般”的表示。
+  // - 这是因为 HeapObject 和 Smi / Double 不是自然兼容链条的一环：
+  //   -HeapObject 只能放堆对象
+  //   - Smi 是立即数小整数
+  //   - Double 对应数值专门表示
+  // - 它不像 Tagged 那样能兜底所有虚拟机值，所以不能简单靠 kind_ > other.kind_
+  // 来说自己更通用。
+  //
+  // `return kind_ > other.kind_;`：
+  // - 对普通情况，直接依赖枚举顺序。
+  // - 所以：
+  //   - Double 比 Smi 更通用
+  //   - Tagged 比 HeapObject / Double / Smi 更通用
+  //   - Smi 比 None 更通用
   bool is_more_general_than(const Representation& other) const {
     if (IsWasmValue()) return false;
     if (IsHeapObject()) return other.IsNone();
     return kind_ > other.kind_;
   }
 
+  // 当前表示 this 能不能被 other 容纳？
+  // 也就是：
+  // - 如果 other 比我更通用，那当然能装下我
+  // - 或者两者完全相同，也能装
+  // - 即 this ≤ other 是否成立
+  // 等价理解：
+  // - Smi.fits_into(Double) == true
+  // - Smi.fits_into(Tagged) == true
+  // - HeapObject.fits_into(Tagged) == true
+  // - Double.fits_into(Smi) == false
   bool fits_into(const Representation& other) const {
     return other.is_more_general_than(*this) || other.Equals(*this);
   }
 
+  // 找一个能同时容纳双方的表示，尽量别太宽
+  // 即求当前Representation和other的“最小公共上界”
   Representation generalize(Representation other) {
+    // 1. 如果 other 能装进当前表示（other ≤ this），
+    //    那当前表示已经够大了，直接返回当前表示。
     if (other.fits_into(*this)) return *this;
+    // 2. 如果 other 比当前更通用（other > this），那就返回 other
     if (other.is_more_general_than(*this)) return other;
+    // 3. 前两种都不成立，说明这俩不在同一条可直接比较的链上，
+    //    那就退化到最终兜底 Tagged。
+    //    例子：Double 和 HeapObject，谁也装不下谁，泛化结果只能是 Tagged
     return Representation::Tagged();
   }
 
