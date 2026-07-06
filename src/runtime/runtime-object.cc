@@ -1019,6 +1019,29 @@ RUNTIME_FUNCTION(Runtime_AllocateHeapNumber) {
 RUNTIME_FUNCTION(Runtime_NewObject) {
   HandleScope scope(isolate);
   DCHECK_EQ(2, args.length());
+  // 正常情况：
+  // ```js
+  // function Foo() {}
+  // let obj = new Foo();
+  // // => target = new_target = Foo对象
+  // ```
+  //////////////////////////////////////////
+  // ECMAScript6特殊场景：
+  // ```js
+  // function Foo() {
+  //   this.x = 1;
+  // }
+  // function Bar() {
+  //   this.y = 1;
+  // }
+  // // 调用Foo的构造函数，创建一个Bar对象
+  // var obj = Reflect.construct(Foo, [], Bar);
+  // print(obj);  // => {x:1}
+  // print(obj.__proto__ == Bar.prototype); // => true
+  // print(obj.__proto__ ==  Foo.prototype); // => false
+  // // => target = Foo对象
+  // // => new_target = Bar对象
+  // ```
   Handle<JSFunction> target = args.at<JSFunction>(0);
   Handle<JSReceiver> new_target = args.at<JSReceiver>(1);
   RETURN_RESULT_OR_FAILURE(
