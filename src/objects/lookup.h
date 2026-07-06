@@ -61,14 +61,30 @@ class V8_EXPORT_PRIVATE LookupIterator final {
   };
 
   enum State {
+    // 当前 holder 是“需要访问检查”的对象，查找前要先过安全检查。
     ACCESS_CHECK,
+    // 这次查找不是普通对象属性查找，
+    // 而是落入 TypedArray 对整数索引的特殊规则里。
     INTEGER_INDEXED_EXOTIC,
+    // 当前对象来自浏览器等宿主环境，且被宿主安装了named/indexed interceptor；
+    // 查找要先交给拦截器回调决定。只有拦截器没拦住，才会继续普通属性查找。
     INTERCEPTOR,
+    // 当前 holder 是 JSProxy ，后续不再按普通对象规则查，改由 Proxy 的 trap
+    // 语义处理。
     JSPROXY,
+    // 当前对象是 Wasm object，属性访问需要走 Wasm 专门语义，不按普通 JSReceiver
+    // 属性表处理。
     WASM_OBJECT,
+    // 当前阶段没找到属性，或者整条原型链查完仍未命中。
     NOT_FOUND,
+    // 找到的是 accessor property，也就是通过 getter/setter 设置的属性。
     ACCESSOR,
+    // 找到的是 data property，也就是一个普通的存储 JavaScript 值的属性；
+    // 或者一个可直接读写的数据槽 / PropertyCell
     DATA,
+    // 个不是“查到了已有属性”，而是写路径里的中间状态，表示“已经准备好把对象迁移到一个新
+    // map / dictionary 形态，从而创建或改造这个属性”。常见于
+    // PrepareTransitionToDataProperty 之后。
     TRANSITION,
     // Set state_ to BEFORE_PROPERTY to ensure that the next lookup will be a
     // PROPERTY lookup.
