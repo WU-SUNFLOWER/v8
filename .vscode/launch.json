@@ -10,12 +10,19 @@
                 //"--trace-ignition",
                 "--allow-natives-syntax",
                 "--print-bytecode",
-                "../../learn_v8/demo-string.js"
+                "--win64-unwinding-info",
+                "--interpreted-frames-native-stack",
+                "../../learn_v8/map-updater.js",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/out/Default",
             "environment": [],
-            "console": "externalTerminal"
+            "console": "externalTerminal",
+            "symbolSearchPath": "${workspaceFolder}/out/Default/",
+            "requireExactSource": false,
+            "logging": {
+                "moduleLoad": true
+            }
         },
         {
             "name": "mksnapshot.exe",
