@@ -22,5 +22,44 @@
   },
   "files.associations": {
     "*.inc": "cpp" // 将 .inc 文件关联到 C++ 语言模式
-  }
+  },
+  // 只保留“当前行是谁改的”
+  "gitlens.currentLine.enabled": true,
+  // 不查询/显示 PR 信息，减少远程服务相关请求
+  "gitlens.currentLine.pullRequests.enabled": false,
+  // 不显示未提交变更的 GitLens 注释
+  "gitlens.currentLine.uncommittedChangesFormat": "",
+  // 关闭 CodeLens：比如文件/函数上方的作者、最近修改等提示
+  "gitlens.codeLens.enabled": false,
+  "gitlens.codeLens.authors.enabled": false,
+  "gitlens.codeLens.recentChange.enabled": false,
+  // 关闭状态栏 blame；你已经有当前行显示了，没必要重复
+  "gitlens.statusBar.enabled": false,
+  "gitlens.statusBar.pullRequests.enabled": false,
+  // 关闭各种 hover 弹窗、diff hover、头像等
+  "gitlens.hovers.enabled": false,
+  "gitlens.hovers.currentLine.enabled": false,
+  "gitlens.hovers.annotations.enabled": false,
+  "gitlens.hovers.avatars": false,
+  "gitlens.hovers.autolinks.enabled": false,
+  "gitlens.hovers.autolinks.enhanced": false,
+  "gitlens.hovers.pullRequests.enabled": false,
+  // 关闭全文件 blame 的额外显示效果
+  "gitlens.blame.avatars": false,
+  "gitlens.blame.heatmap.enabled": false,
+  "gitlens.blame.highlight.enabled": false,
+  // 减少 GitLens 侧边栏视图自动刷新/自动展开
+  "gitlens.views.repositories.autoRefresh": false,
+  "gitlens.views.repositories.autoReveal": false,
+  "gitlens.views.repositories.includeWorkingTree": false,
+  // 关闭 GitLens 各视图里的 PR 查询
+  "gitlens.views.commits.pullRequests.enabled": false,
+  "gitlens.views.branches.pullRequests.enabled": false,
+  "gitlens.views.remotes.pullRequests.enabled": false,
+  "gitlens.views.worktrees.pullRequests.enabled": false,
+  "gitlens.views.contributors.pullRequests.enabled": false,
+  // 贡献者统计在大仓库可能耗时，关掉
+  "gitlens.views.contributors.showStatistics": false,
+  // VS Code 自带 Git 自动 fetch；不需要实时同步远程时可关闭
+  "git.autofetch": false
 }
