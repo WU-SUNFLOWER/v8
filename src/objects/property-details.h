@@ -87,7 +87,11 @@ class TypeInfo;
 // kData =>
 //   普通对象属性，例如obj.x = 123
 // kAccessor =>
-//   访问器属性，例如通过Object.defineProperty以getter/setter形式定义的属性
+//   访问器属性，
+//   既可以指通过Object.defineProperty以getter/setter形式定义的属性
+//   也可以指V8/宿主环境中通过native get/set访问器所实现的对象属性。
+//   前者对象Map的DescriptorArray中的槽位存AccessorPair对象，
+//   后者槽位中存的是AccessorInfo对象。（见src/objects/descriptor-array.tq）
 enum class PropertyKind { kData = 0, kAccessor = 1 };
 
 // Order of modes is significant.

@@ -77,7 +77,8 @@ class V8_EXPORT_PRIVATE LookupIterator final {
     WASM_OBJECT,
     // 当前阶段没找到属性，或者整条原型链查完仍未命中。
     NOT_FOUND,
-    // 找到的是 accessor property，也就是通过 getter/setter 设置的属性。
+    // 找到的是 accessor property，
+    // 包括通过JavaScript或native代码getter/setter所实现的属性。
     ACCESSOR,
     // 找到的是 data property，也就是一个普通的存储 JavaScript 值的属性；
     // 或者一个可直接读写的数据槽 / PropertyCell

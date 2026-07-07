@@ -121,6 +121,23 @@ void AccessorAssembler::HandlePolymorphicCase(
   // This is a hand-crafted loop that iterates backwards and only compares
   // against zero at the end, since we already know that we will have at least a
   // single entry in the {feedback} array anyways.
+  // 下面这段逻辑的伪代码：
+  // ```
+  // let index = length - kEntrySize;
+  // do {
+  //   let maybe_cached_map = feedback[index];
+  //   if (maybe_cached_map === weak_lookup_start_object_map) {
+  //     // ic命中，读取handler（在feedback[index+1]）
+  //     // 然后进入快速路径，根据handler直接读JavaScript对象属性
+  //     var_handler = LoadWeakFixedArrayElement(feedback, index, kTaggedSize);
+  //     goto if_handler;
+  //   }
+  //   index -= kEntrySize;
+  //   if (index <= 0) {
+  //     goto if_miss;  // ic未命中，进入fallback慢速路径
+  //   }
+  // } while (true);
+  // ```
   TVARIABLE(Int32T, var_index, Int32Sub(length, Int32Constant(kEntrySize)));
   Label loop(this, &var_index), loop_next(this);
   Goto(&loop);
@@ -422,7 +439,9 @@ void AccessorAssembler::HandleLoadWasmField(
     Unreachable();
   }
   BIND(&unexpected_type);
-  { Unreachable(); }
+  {
+    Unreachable();
+  }
 }
 
 void AccessorAssembler::HandleLoadWasmField(
@@ -1516,7 +1535,9 @@ void AccessorAssembler::CheckFieldType(TNode<DescriptorArray> descriptors,
   Goto(&all_fine);
 
   BIND(&r_smi);
-  { Branch(TaggedIsSmi(value), &all_fine, bailout); }
+  {
+    Branch(TaggedIsSmi(value), &all_fine, bailout);
+  }
 
   BIND(&r_double);
   {
@@ -3009,6 +3030,7 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
   GotoIf(IsDeprecatedMap(lookup_start_object_map), &miss);
 
   // Inlined fast path.
+  // 有Monomorphic或Polymorphic状态的ic缓存，先尝试在缓存中查找handler
   {
     Comment("LoadIC_BytecodeHandler_fast");
 
@@ -3034,6 +3056,7 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
     }
   }
 
+  // 缓存已进入Megamorphic状态，走这里
   BIND(&stub_call);
   {
     Comment("LoadIC_BytecodeHandler_noninlined");
@@ -3046,6 +3069,7 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
                                p->slot(), p->vector());
   }
 
+  // 当前JavaScript函数还不够hot，没有feedback vector，走这里
   BIND(&no_feedback);
   {
     Comment("LoadIC_BytecodeHandler_nofeedback");
@@ -3056,6 +3080,9 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
         SmiConstant(FeedbackSlotKind::kLoadProperty));
   }
 
+  // 缓存已进入Polymorphic状态，但经过查找发现未命中ic，
+  // 走这里进入 c++ runtime 处理。
+  // 接下去可能要更新缓存或者将缓存状态升级为Megamorphic？
   BIND(&miss);
   {
     Comment("LoadIC_BytecodeHandler_miss");
@@ -3154,7 +3181,9 @@ void AccessorAssembler::LoadSuperIC(const LoadICParameters* p) {
   }
 
   BIND(&no_feedback);
-  { LoadSuperIC_NoFeedback(p); }
+  {
+    LoadSuperIC_NoFeedback(p);
+  }
 
   BIND(&try_polymorphic);
   TNode<HeapObject> strong_feedback = GetHeapObjectIfStrong(feedback, &miss);
@@ -3757,6 +3786,7 @@ void AccessorAssembler::StoreIC(const StoreICParameters* p) {
   {
     auto runtime = p->IsDefineNamedOwn() ? Runtime::kDefineNamedOwnIC_Miss
                                          : Runtime::kStoreIC_Miss;
+    Print("##################AccessorAssembler::StoreIC##################");
     TailCallRuntime(runtime, p->context(), p->value(), p->slot(), p->vector(),
                     p->receiver(), p->name());
   }

@@ -1941,14 +1941,15 @@ class BinaryOperationFeedback {
  public:
   enum {
     kNone = 0x0,
-    kSignedSmall = 0x1,
-    kSignedSmallInputs = 0x3,
-    kNumber = 0x7,
-    kNumberOrOddball = 0xF,
-    kString = 0x10,
-    kBigInt64 = 0x20,
-    kBigInt = 0x60,
-    kAny = 0x7F
+    kSignedSmall = 0x1,        // 两个smi进行运算，结果还是smi
+    kSignedSmallInputs = 0x3,  // 两个smi进行运算，但结果是number
+    kNumber = 0x7,             // number和smi混合运算，或者两个number进行运算
+    kNumberOrOddball = 0xF,    // number/smi和oddball值进行运算
+    kString = 0x10,            // 字符串拼接运算
+    kBigInt64 =
+        0x20,        // 两个BigInt进行运算 ，且当前平台能走“64位小BigInt快路径”
+    kBigInt = 0x60,  // 两个BigInt进行运算 ，但不能走快路径
+    kAny = 0x7F      // 其他无法被归类的运算，例如`"a" + 1`
   };
 };
 

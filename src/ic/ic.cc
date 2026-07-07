@@ -858,6 +858,8 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
       return MaybeObjectHandle(BUILTIN_CODE(isolate(), LoadIC_StringLength));
     }
 
+    // 对于获取JavaScript字符串的length属性操作，
+    // 直接返回LoadIC_StringWrapperLength内建函数作为ic handler
     if (IsStringWrapper(*lookup_start_object) &&
         *lookup->name() == roots.length_string()) {
       TRACE_HANDLER_STATS(isolate(), LoadIC_StringWrapperLength);
@@ -866,6 +868,8 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
     }
 
     // Use specialized code for getting prototype of functions.
+    // 对于获取JavaScript函数prototype属性的操作，
+    // 直接返回LoadIC_FunctionPrototype内建函数作为ic handler
     if (IsJSFunction(*lookup_start_object) &&
         *lookup->name() == roots.prototype_string() &&
         !JSFunction::cast(*lookup_start_object)
@@ -912,6 +916,9 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
       // The method will only return true for absolute truths based on the
       // lookup start object maps.
       FieldIndex field_index;
+      // 如果是在读某些内建对象中可以直接通过偏移访问到的数据，
+      // 比如JavaScript字符串或者数组的length属性，
+      // 直接包装并返回相应数据的偏移量作为ic handler。
       if (Accessors::IsJSObjectFieldAccessor(isolate(), map, lookup->name(),
                                              &field_index)) {
         TRACE_HANDLER_STATS(isolate(), LoadIC_LoadFieldDH);
