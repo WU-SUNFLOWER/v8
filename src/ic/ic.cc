@@ -672,7 +672,8 @@ bool IC::UpdatePolymorphicIC(Handle<Name> name,
   int number_of_maps = static_cast<int>(maps_and_handlers.size());
   int number_of_valid_maps =
       number_of_maps - deprecated_maps - (handler_to_overwrite != -1);
-
+  // POLYMORPHIC缓存中已有的记录数（<map, handler>键值对数）超出阈值，
+  // 则拒绝继续扩容POLYMORPHIC缓存，迫使ic缓存状态向MEGAMORPHIC转换！
   if (number_of_valid_maps >= v8_flags.max_valid_polymorphic_map_count) {
     return false;
   }
@@ -697,7 +698,8 @@ bool IC::UpdatePolymorphicIC(Handle<Name> name,
     } else {
       maps_and_handlers.push_back(MapAndHandler(map, handler));
     }
-
+    // 把std::vector类型的maps_and_handlers转成v8内部
+    // 可读的POLYMORPHIC ic缓存结构，写回JavaScript函数的feedback vector当中
     ConfigureVectorState(name, maps_and_handlers);
   }
 
@@ -761,13 +763,20 @@ void IC::SetCache(Handle<Name> name, const MaybeObjectHandle& handler) {
       if (UpdatePolymorphicIC(name, handler)) break;
       if (UpdateMegaDOMIC(handler, name)) break;
       if (!is_keyed() || state() == RECOMPUTE_HANDLER) {
+        // 把POLYMORPHIC缓存降级为MEGAMORPHIC缓存step1：
+        // 将原先POLYMORPHIC缓存中的所有记录写入全局StubCache当中
         CopyICToMegamorphicCache(name);
       }
       V8_FALLTHROUGH;
     case MEGADOM:
+      // 把POLYMORPHIC缓存降级为MEGAMORPHIC缓存step2：
+      // 将原先JavaScript函数feedback vector槽位中的POLYMORPHIC缓存数据结构
+      // 替换为MEGAMORPHIC缓存数据结构，即：
+      // [<Symbol: (megamorphic_symbol)>, 0或1]
       ConfigureVectorState(MEGAMORPHIC, name);
       V8_FALLTHROUGH;
     case MEGAMORPHIC:
+      // UpdateMegamorphicCache中会将当前查询对象属性的name、map和handler写进StubCache缓存
       UpdateMegamorphicCache(lookup_start_object_map(), name, handler);
       // Indicate that we've handled this case.
       vector_set_ = true;

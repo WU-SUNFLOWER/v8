@@ -3057,6 +3057,7 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
   }
 
   // 缓存已进入Megamorphic状态，走这里
+  // 在AccessorAssembler::LoadIC_Noninlined当中，可以进一步找到查询StubCache缓存的宏汇编
   BIND(&stub_call);
   {
     Comment("LoadIC_BytecodeHandler_noninlined");

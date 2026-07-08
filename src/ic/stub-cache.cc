@@ -80,6 +80,13 @@ bool CommonStubCacheChecks(StubCache* stub_cache, Tagged<Name> name,
 }  // namespace
 #endif
 
+// StubCache主表+附表设计
+// 特点：
+//   - 无哈希冲突探测
+//   - 主副表中都有缓存记录中，淘汰附表（最早写入的缓存）中的记录（FIFO思想）
+// 优点：
+//   - 主副表采用不同的哈希算法，相比单表进一步降低哈希冲突概率
+//   - Set操作最多两次写，Get操作最多两次读（时间复杂度均为O(1)）
 void StubCache::Set(Tagged<Name> name, Tagged<Map> map, MaybeObject handler) {
   DCHECK(CommonStubCacheChecks(this, name, map, handler));
 

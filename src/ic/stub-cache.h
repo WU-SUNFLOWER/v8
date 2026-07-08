@@ -29,6 +29,8 @@ class SCTableReference {
   friend class StubCache;
 };
 
+// StubCache挂在Isolate实例上，提供<(name, map), handler>缓存
+// 作为MEGAMORPHIC ic尝试走LookupIterator慢速查找前的最后一道全局缓存
 class V8_EXPORT_PRIVATE StubCache {
  public:
   struct Entry {
