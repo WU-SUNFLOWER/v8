@@ -514,6 +514,8 @@ namespace internal {
   F(ConstructThinString, 1, 1)                \
   F(CurrentFrameIsTurbofan, 0, 1)             \
   F(DebugPrint, -1, 1)                        \
+  F(DebugPrintProto, 1, 1)                    \
+  F(DebugPrintSimply, 1, 1)                   \
   F(DebugPrintFloat, 5, 1)                    \
   F(DebugPrintPtr, 1, 1)                      \
   F(DebugPrintWord, 5, 1)                     \

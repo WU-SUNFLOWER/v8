@@ -1286,6 +1286,52 @@ RUNTIME_FUNCTION(Runtime_DebugPrint) {
   return args[0];
 }
 
+RUNTIME_FUNCTION(Runtime_DebugPrintProto) {
+  HandleScope scope(isolate);
+
+  if (args.length() != 1) {
+    return CrashUnlessFuzzing(isolate);
+  }
+
+  MaybeObject maybe_object(*args.address_of_arg_at(0));
+  if (!maybe_object.IsCleared()) {
+    Handle<Object> object = handle(maybe_object.GetHeapObjectOrSmi(), isolate);
+    if (!IsJSReceiver(*object)) return CrashUnlessFuzzing(isolate);
+
+    auto receiver = Handle<JSReceiver>::cast(object);
+    Print(*receiver);
+    Print(receiver->map());
+    if (receiver->map()->is_prototype_map()) {
+      Print(receiver->map()->prototype_info());
+    }
+  }
+
+  return args[0];
+}
+
+RUNTIME_FUNCTION(Runtime_DebugPrintSimply) {
+  HandleScope shs(isolate);
+
+  StdoutStream os;
+  if (args.length() != 1) {
+    return CrashUnlessFuzzing(isolate);
+  }
+
+  MaybeObject maybe_object(*args.address_of_arg_at(0));
+  if (!maybe_object.IsCleared()) {
+    Handle<Object> object = handle(maybe_object.GetHeapObjectOrSmi(), isolate);
+    Handle<String> result;
+    ASSIGN_RETURN_FAILURE_ON_EXCEPTION(isolate, result,
+                                       Object::ToString(isolate, object));
+
+    std::unique_ptr<std::ostream> output_stream(new StdoutStream());
+    std::unique_ptr<char[]> c_str = result->ToCString();
+    *output_stream << c_str.get() << std::endl;
+  }
+
+  return args[0];
+}
+
 RUNTIME_FUNCTION(Runtime_DebugPrintPtr) {
   SealHandleScope shs(isolate);
   StdoutStream os;
