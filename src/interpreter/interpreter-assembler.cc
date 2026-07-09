@@ -1051,6 +1051,18 @@ TNode<Int32T> InterpreterAssembler::UpdateInterruptBudget(
   return new_budget;
 }
 
+// V8 给每个函数准备的一张“执行额度卡” 。
+// ## 函数每执行一点代码，就从这张卡里扣一点；一旦扣到 0 以下，V8
+// 就会停下来做一次“检查”。 这个检查通常不是坏事，它主要用来做两类事情：
+// 1. 看看有没有外部中断要处理：比如栈检查、终止执行、调试器/采样器相关中断。
+// 2. 决定这个函数是不是“热”到该升级了：比如从解释执行（Ignition）切到更快的
+//    Sparkplug / Maglev / TurboFan。
+// ## 它为什么需要这个东西？
+// 如果V8每执行一条字节码都做一次“要不要优化”“要不要处理中断”的检查，开销会很大。
+// 所以它用了一个很经典的办法：
+// - 平时只做很便宜的“减法”
+// - 预算耗尽时，才进入比较重的 runtime 逻辑
+// 这就像“攒一段时间再统一检查一次”。
 void InterpreterAssembler::DecreaseInterruptBudget(
     TNode<Int32T> weight, StackCheckBehavior stack_check_behavior) {
   Comment("[ DecreaseInterruptBudget");
@@ -1335,6 +1347,7 @@ void InterpreterAssembler::UpdateInterruptBudgetOnReturn() {
   // length of the back-edge, so we just have to correct for the non-zero offset
   // of the first bytecode.
 
+  // 这次函数执行过程中，大概执行了多少字节码路径长度。
   TNode<Int32T> profiling_weight =
       Int32Sub(TruncateIntPtrToInt32(BytecodeOffset()),
                Int32Constant(kFirstBytecodeOffset));

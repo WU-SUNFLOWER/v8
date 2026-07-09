@@ -402,6 +402,7 @@ void TieringManager::OnInterruptTick(Handle<JSFunction> function,
       function->ActiveTierIsIgnition();
 
   // Ensure that the feedback vector has been allocated.
+  // 当前函数还没有feedback vector，就先给它分配一个
   if (!had_feedback_vector) {
     if (compile_sparkplug) {
       // Mark the function as compiled with sparkplug before the feedback vector
@@ -469,11 +470,14 @@ void TieringManager::OnInterruptTick(Handle<JSFunction> function,
   OnInterruptTickScope scope;
   Tagged<JSFunction> function_obj = *function;
 
+  // 如果已经过了 Sparkplug 阶段，是否继续向更高 tier（如 Turbofan /
+  // Maglev）推进？
   MaybeOptimizeFrame(function_obj, code_kind);
 
   // Make sure to set the interrupt budget after maybe starting an optimization,
   // so that the interrupt budget size takes into account tiering state.
   DCHECK(had_feedback_vector);
+  // 重新发放中断预算
   function->SetInterruptBudget(isolate_);
 }
 

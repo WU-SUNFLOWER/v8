@@ -43,7 +43,7 @@ extern class ClosureFeedbackCellArray extends HeapObject {
 extern class FeedbackVector extends HeapObject {
   // 槽位数组的长度
   const length: int32;
-  // 对应 JavaScript 函数被调用的次数
+  // 从触发FeedbackVector开启的那一次算起，对应 JavaScript 函数被调用的次数
   invocation_count: int32;
   @if(TAGGED_SIZE_8_BYTES) optional_padding: uint32;
   // TODO(jgruber): These bits are available.

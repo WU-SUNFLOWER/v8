@@ -587,6 +587,8 @@ void JSFunction::CreateAndAttachFeedbackVector(
   EnsureClosureFeedbackCellArray(function, false);
   Handle<ClosureFeedbackCellArray> closure_feedback_cell_array =
       handle(function->closure_feedback_cell_array(), isolate);
+  // 从虚拟机堆上申请一个FeedbackVector对象，
+  // 并安装到JavaScript函数持有的FeedbackCell对象上去
   Handle<FeedbackVector> feedback_vector = FeedbackVector::New(
       isolate, shared, closure_feedback_cell_array,
       handle(function->raw_feedback_cell(isolate), isolate), compiled_scope);
@@ -597,6 +599,7 @@ void JSFunction::CreateAndAttachFeedbackVector(
   DCHECK(function->raw_feedback_cell() !=
          isolate->heap()->many_closures_cell());
   DCHECK_EQ(function->raw_feedback_cell()->value(), *feedback_vector);
+  // 重新发放中断预算
   function->SetInterruptBudget(isolate);
 
   DCHECK_EQ(v8_flags.log_function_events,
@@ -604,6 +607,7 @@ void JSFunction::CreateAndAttachFeedbackVector(
 
   // Additionally, detect activations of this function on the stack, and update
   // the feedback vector.
+  // 把新创建的FeedbackVector对象的引用，回填进解释器栈帧（InterpretedFrame）的FBV槽位当中去
   JavaScriptStackFrameIterator it(isolate);
   while (!it.done()) {
     if (it.frame()->is_interpreted() && it.frame()->function() == *function) {
