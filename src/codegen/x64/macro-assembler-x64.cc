@@ -580,8 +580,8 @@ void MacroAssembler::CallEphemeronKeyBarrier(Register object,
   MovePair(slot_address_parameter, slot_address, object_parameter, object);
 
   Call(isolate()->builtins()->code_handle(
-            Builtins::GetEphemeronKeyBarrierStub(fp_mode)),
-        RelocInfo::CODE_TARGET);
+           Builtins::GetEphemeronKeyBarrierStub(fp_mode)),
+       RelocInfo::CODE_TARGET);
   PopAll(registers);
 }
 
@@ -3462,71 +3462,117 @@ void MacroAssembler::StackOverflowCheck(
   j(less_equal, stack_overflow, stack_overflow_distance);
 }
 
+// 这里实现JavaScript函数调用时“少传实参补 undefined ，多传实参不截断”的语义。
+// function f(a, b, c, ...args) { ... }
+// f(1);        // b, c 应该是 undefined
+// f(1, 2, 3);  // 正常
+// f(1, 2, 3, 4, 5); // 多出来的参数也要保留，后面可以打包成args
+////////////////////////////////////////////////////////////////////
+// 假设：
+// function f(a, b, c, d) {}
+// f(1, 2);  // 此时少了两个参数： c 、 d
+// （1）type == InvokeType::kCall时的堆栈变化情况
+// 执行前：
+// rsp -> +-------------------+ 低地址
+//        | receiver          |
+//        +-------------------+
+//        | arg0 = 1          |   // a
+//        +-------------------+
+//        | arg1 = 2          |   // b
+//        +-------------------+ 高地址
+// 执行后：
+// rsp -> +-------------------+ 低地址
+//        | receiver          |
+//        +-------------------+
+//        | arg0 = 1          |   // a
+//        +-------------------+
+//        | arg1 = 2          |   // b
+//        +-------------------+
+//        | undefined         |   // c
+//        +-------------------+
+//        | undefined         |   // d
+//        +-------------------+ 高地址
+// （2）type == InvokeType::kCall时的堆栈变化情况
+// 这种type对应的是尾调用式跳转，返回地址需要自行在栈顶维护。因此在调整堆栈时需要一并进行挪动。
+// 执行后：
+// rsp -> +-------------------+ 低地址
+//        | return address    |
+//        +-------------------+
+//        | receiver          |
+//        +-------------------+
+//        | arg0 = 1          |
+//        +-------------------+
+//        | arg1 = 2          |
+//        +-------------------+
+//        | undefined         |
+//        +-------------------+
+//        | undefined         |
+//        +-------------------+ 高地址
 void MacroAssembler::InvokePrologue(Register expected_parameter_count,
                                     Register actual_parameter_count,
                                     InvokeType type) {
-    ASM_CODE_COMMENT(this);
-    if (expected_parameter_count == actual_parameter_count) {
-      Move(rax, actual_parameter_count);
-      return;
-    }
-    Label regular_invoke;
+  ASM_CODE_COMMENT(this);
+  if (expected_parameter_count == actual_parameter_count) {
+    Move(rax, actual_parameter_count);
+    return;
+  }
+  Label regular_invoke;
 
-    // If overapplication or if the actual argument count is equal to the
-    // formal parameter count, no need to push extra undefined values.
-    subq(expected_parameter_count, actual_parameter_count);
-    j(less_equal, &regular_invoke, Label::kFar);
+  // If overapplication or if the actual argument count is equal to the
+  // formal parameter count, no need to push extra undefined values.
+  // 如果expected_parameter_count≤actual_parameter_count，则啥也不做
+  subq(expected_parameter_count, actual_parameter_count);
+  j(less_equal, &regular_invoke, Label::kFar);
 
-    Label stack_overflow;
-    StackOverflowCheck(expected_parameter_count, &stack_overflow);
+  Label stack_overflow;
+  StackOverflowCheck(expected_parameter_count, &stack_overflow);
 
-    // Underapplication. Move the arguments already in the stack, including the
-    // receiver and the return address.
-    {
-      Label copy, check;
-      Register src = r8, dest = rsp, num = r9, current = r11;
-      movq(src, rsp);
-      leaq(kScratchRegister,
-           Operand(expected_parameter_count, times_system_pointer_size, 0));
-      AllocateStackSpace(kScratchRegister);
-      // Extra words are for the return address (if a jump).
-      int extra_words =
-          type == InvokeType::kCall ? 0 : kReturnAddressStackSlotCount;
+  // Underapplication. Move the arguments already in the stack, including the
+  // receiver and the return address.
+  {
+    Label copy, check;
+    Register src = r8, dest = rsp, num = r9, current = r11;
+    movq(src, rsp);
+    leaq(kScratchRegister,
+         Operand(expected_parameter_count, times_system_pointer_size, 0));
+    AllocateStackSpace(kScratchRegister);
+    // Extra words are for the return address (if a jump).
+    int extra_words =
+        type == InvokeType::kCall ? 0 : kReturnAddressStackSlotCount;
 
-      leaq(num, Operand(rax, extra_words));  // Number of words to copy.
-      Move(current, 0);
-      // Fall-through to the loop body because there are non-zero words to copy.
-      bind(&copy);
-      movq(kScratchRegister,
-           Operand(src, current, times_system_pointer_size, 0));
-      movq(Operand(dest, current, times_system_pointer_size, 0),
-           kScratchRegister);
-      incq(current);
-      bind(&check);
-      cmpq(current, num);
-      j(less, &copy);
-      leaq(r8, Operand(rsp, num, times_system_pointer_size, 0));
-    }
-    // Fill remaining expected arguments with undefined values.
-    LoadRoot(kScratchRegister, RootIndex::kUndefinedValue);
-    {
-      Label loop;
-      bind(&loop);
-      decq(expected_parameter_count);
-      movq(Operand(r8, expected_parameter_count, times_system_pointer_size, 0),
-           kScratchRegister);
-      j(greater, &loop, Label::kNear);
-    }
-    jmp(&regular_invoke);
+    leaq(num, Operand(rax, extra_words));  // Number of words to copy.
+    Move(current, 0);
+    // Fall-through to the loop body because there are non-zero words to copy.
+    bind(&copy);
+    movq(kScratchRegister, Operand(src, current, times_system_pointer_size, 0));
+    movq(Operand(dest, current, times_system_pointer_size, 0),
+         kScratchRegister);
+    incq(current);
+    bind(&check);
+    cmpq(current, num);
+    j(less, &copy);
+    leaq(r8, Operand(rsp, num, times_system_pointer_size, 0));
+  }
+  // Fill remaining expected arguments with undefined values.
+  LoadRoot(kScratchRegister, RootIndex::kUndefinedValue);
+  {
+    Label loop;
+    bind(&loop);
+    decq(expected_parameter_count);
+    movq(Operand(r8, expected_parameter_count, times_system_pointer_size, 0),
+         kScratchRegister);
+    j(greater, &loop, Label::kNear);
+  }
+  jmp(&regular_invoke);
 
-    bind(&stack_overflow);
-    {
-      FrameScope frame(
-          this, has_frame() ? StackFrame::NO_FRAME_TYPE : StackFrame::INTERNAL);
-      CallRuntime(Runtime::kThrowStackOverflow);
-      int3();  // This should be unreachable.
-    }
-    bind(&regular_invoke);
+  bind(&stack_overflow);
+  {
+    FrameScope frame(
+        this, has_frame() ? StackFrame::NO_FRAME_TYPE : StackFrame::INTERNAL);
+    CallRuntime(Runtime::kThrowStackOverflow);
+    int3();  // This should be unreachable.
+  }
+  bind(&regular_invoke);
 }
 
 void MacroAssembler::CallDebugOnFunctionCall(Register fun, Register new_target,

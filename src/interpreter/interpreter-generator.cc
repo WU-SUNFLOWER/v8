@@ -1422,8 +1422,11 @@ class InterpreterJSCallAssembler : public InterpreterAssembler {
     };
     const int kSlotOperandIndex =
         kFirstArgumentOperandIndex + kReceiverAndArgOperandCount;
+    // 获取当前字节码指令参数中保存的feedback vector的槽位下标
     TNode<UintPtrT> slot_id = BytecodeOperandIdx(kSlotOperandIndex);
     TNode<HeapObject> maybe_feedback_vector = LoadFeedbackVector();
+    // 更新feedback vector中的反馈信息
+    // CollectCallFeedback的实现代码见src/builtins/ic-callable.tq
     CollectCallFeedback(function, receiver, context, maybe_feedback_vector,
                         slot_id);
 #endif  // !V8_JITLESS

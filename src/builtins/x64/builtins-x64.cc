@@ -1139,12 +1139,16 @@ void Builtins::Generate_InterpreterEntryTrampoline(
   __ Move(
       kInterpreterDispatchTableRegister,
       ExternalReference::interpreter_dispatch_table_address(masm->isolate()));
+  // 从 BytecodeArray 中取出 kInterpreterBytecodeOffsetRegister
+  // 下标位置的字节码指令
   __ movzxbq(kScratchRegister,
              Operand(kInterpreterBytecodeArrayRegister,
                      kInterpreterBytecodeOffsetRegister, times_1, 0));
+  // 从分发表中取出这条字节码指令对应的字节码指令处理程序入口地址
   __ movq(kJavaScriptCallCodeStartRegister,
           Operand(kInterpreterDispatchTableRegister, kScratchRegister,
                   times_system_pointer_size, 0));
+  // 跳转进字节码指令处理程序
   __ call(kJavaScriptCallCodeStartRegister);
 
   __ RecordComment("--- InterpreterEntryReturnPC point ---");
@@ -1171,6 +1175,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(
       Operand(rbp, InterpreterFrameConstants::kBytecodeOffsetFromFp));
 
   // Either return, or advance to the next bytecode and dispatch.
+  // 执行函数返回操作，或跳转去处理下一条字节码
   Label do_return;
   __ movzxbq(rbx, Operand(kInterpreterBytecodeArrayRegister,
                           kInterpreterBytecodeOffsetRegister, times_1, 0));

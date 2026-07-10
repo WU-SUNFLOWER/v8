@@ -82,6 +82,11 @@ extern class SharedFunctionInfo extends HeapObject {
   unique_id: int32;
   // Age used for code flushing.
   // TODO(dinfuehr): Merge this field with function_literal_id to save memory.
+  // V8中的GC模块根据该字段判断函数对应的bytecode/baseline code是否已经很久没用了
+  // - 每次V8执行GC标记时，都会对扫描到的函数的age进行一次老化
+  // - 每次函数被调用时，age字段都会被清零（见ResetSharedFunctionInfoAge）
+  // - 当 age 达到一定阈值（bytecode_old_age）后，该函数的bytecode/baseline code就会从
+  //   虚拟机堆内存中被释放掉。
   age: uint16;
   padding: uint16;
 }
