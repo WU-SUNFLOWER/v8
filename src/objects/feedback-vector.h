@@ -883,8 +883,17 @@ class V8_EXPORT_PRIVATE FeedbackNexus final {
   // count (taken from the type feedback vector).
   float ComputeCallFrequency();
 
+  // FeebackVector中提供CallIC的extra槽的逻辑布局：
+  // | bit 31 ........ bit 2 | bit 1 | bit 0 |
+  // |      call_count       |content| spec  |
+  // 注意：实际物理布局会受到Smi在当前平台的有效宽度的制约，
+  //      例如在32位平台，call_count位域的宽度会再少一位！
+
+  // 是否允许编译器基于这个 call feedback 做推测优化
   using SpeculationModeField = base::BitField<SpeculationMode, 0, 1>;
+  // 主槽里记录的是调用目标（kTarget）还是接收者（kReceiver）
   using CallFeedbackContentField = base::BitField<CallFeedbackContent, 1, 1>;
+  // 这个call操作执行了几次
   using CallCountField = base::BitField<uint32_t, 2, 30>;
 
   // For InstanceOf ICs.
