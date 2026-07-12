@@ -32,6 +32,16 @@ extern class JSFunction extends JSFunctionOrBoundFunctionOrWrappedFunction {
   // When the sandbox is enabled, the Code object is referenced through an
   // indirect pointer. Otherwise, it is a regular tagged pointer.
   @if(V8_ENABLE_SANDBOX) code: IndirectPointer<Code>;
+  // 当前这个闭包实例“实际要跳转去执行”的入口 Code。
+  // 对普通 JavaScript 函数，常见情况包括：
+  // - CompileLazy builtin 对应的 Code（函数尚未完成懒编译）
+  // - InterpreterEntryTrampoline Code（当前函数已被编译为字节码，但尚未被JIT）
+  // - Baseline JIT 生成的基线 Code
+  // - Maglev / TurboFan JIT 生成并已安装到该函数上的优化 Code
+  // 注意：
+  // - 这是“函数实例级”的当前入口，不等同于 SharedFunctionInfo::function_data。
+  // - 某些优化代码（尤其 OSR 代码）可能只缓存在 FeedbackVector::maybe_optimized_code 中，
+  //   此时并不会直接写到这里。
   @ifnot(V8_ENABLE_SANDBOX) code: Code;
   shared_function_info: SharedFunctionInfo;
   context: Context;

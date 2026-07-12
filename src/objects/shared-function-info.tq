@@ -51,6 +51,16 @@ extern class SharedFunctionInfo extends HeapObject {
   // field as a weak pointer if there is aged bytecode. If there is no bytecode
   // or if the bytecode is young then we treat it as a strong pointer. This is
   // done to support flushing of bytecode.
+  // 记录“函数共享级”的编译产物/执行数据；多个函数实例可以共享同一个 SFI，因此这个字段
+  // 不应该被理解为某个具体函数当前正在执行的入口。
+  // 对普通 JavaScript 函数，常见情况包括：
+  // - UncompiledDataWithoutPreparseDataBytecodeArray（尚未完成懒编译）
+  // - BytecodeArray（已生成字节码，解释器路径使用）
+  // - Baseline Code（已生成基线代码）
+  // 注意：
+  // - 它和 JSFunction::code 的粒度不同：后者是“某个函数实例当前挂着的入口 Code”。
+  // - 基于反馈向量生成的优化代码通常缓存于 FeedbackVector::maybe_optimized_code，
+  //   之后才可能被安装到某个 JSFunction::code 上。
   @customWeakMarking function_data: Object;
   name_or_scope_info: String|NoSharedNameSentinel|ScopeInfo;
   outer_scope_info_or_feedback_metadata: HeapObject;

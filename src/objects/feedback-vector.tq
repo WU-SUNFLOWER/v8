@@ -50,11 +50,16 @@ extern class FeedbackVector extends HeapObject {
   placeholder0: uint8;
   osr_state: OsrState;
   flags: FeedbackVectorFlags;
-  // 对应 JavaScript 函数的 SFI 对象
-  // 便于读到 JavaScript 函数的字节码序列
+  // 关联到对应函数的 SharedFunctionInfo，便于从反馈向量回到共享的字节码和元数据。
   shared_function_info: SharedFunctionInfo;
   closure_feedback_cell_array: ClosureFeedbackCellArray;
+  // 反向指回“拥有这个 FeedbackVector 的 FeedbackCell”。
+  // 某些运行时路径（例如 tiering / interrupt budget 调整）手里只有 FeedbackVector，
+  // 这时会通过该字段回到所属的 FeedbackCell。
   parent_feedback_cell: FeedbackCell;
+  // 基于这份反馈向量缓存下来的优化代码（弱引用）。
+  // 它不是 SharedFunctionInfo::function_data 那种“共享级未优化执行体”，
+  // 也不一定已经安装到 JSFunction::code；OSR 优化代码尤其常见这种情况。
   maybe_optimized_code: Weak<Code>;
   @cppRelaxedLoad raw_feedback_slots[length]: MaybeObject;
 }

@@ -1026,6 +1026,8 @@ void Builtins::Generate_InterpreterEntryTrampoline(
                                   SharedFunctionInfo::kFunctionDataOffset));
 
   Label is_baseline;
+  // 如果函数对应的SharedFunctionInfo中已有生成好的baseline code，
+  // 则直接进入其中执行，不再走ignition解释器。
   GetSharedFunctionInfoBytecodeOrBaseline(
       masm, kInterpreterBytecodeArrayRegister, kScratchRegister, &is_baseline);
 
@@ -1236,10 +1238,14 @@ void Builtins::Generate_InterpreterEntryTrampoline(
     __ j(not_equal, &install_baseline_code);
 
     // Check the tiering state.
+    // 检查feedback vector的maybe_optimized_code字段中
+    // 是否已有maglev/turbofan生成的优化代码。
+    // 如果有就跳转过去执行，不走baseline code了。
     __ CheckFeedbackVectorFlagsAndJumpIfNeedsProcessing(
         feedback_vector, CodeKind::BASELINE, &flags_need_processing);
 
     // Load the baseline code into the closure.
+    // 把baseline code对象挂到JSFunction的code字段上去
     __ Move(rcx, kInterpreterBytecodeArrayRegister);
     static_assert(kJavaScriptCallCodeStartRegister == rcx, "ABI mismatch");
     __ ReplaceClosureCodeWithOptimizedCode(

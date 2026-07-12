@@ -15,6 +15,7 @@ bitfield struct ScriptFlags extends uint31 {
   produce_compile_hints: bool: 1 bit;
 }
 
+// 用于描述一段JavaScript脚本的源码、名称等元信息
 extern class Script extends Struct {
   // [source]: the script source.
   source: String|Undefined;

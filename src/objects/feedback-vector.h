@@ -588,6 +588,20 @@ class SharedFeedbackSlot {
 // of int32 data. The length is never stored - it is always calculated from
 // slot_count. All instances are created through the static New function, and
 // the number of slots is static once an instance is created.
+//
+// FeedbackMetadata挂在SharedFunctionInfo实例上，主要回答三个问题：
+// - 这个函数对应的 FeedbackVector 一共有多少个 slot
+//   - 注：这里指的是反馈槽位的数目，有的反馈槽位可能包括1个主槽和1个副槽，
+//        在这里都记作"1个槽位"。反馈槽位中是否包含主槽和副槽，在
+//        FeedbackMetadata::GetSlotSize当中才进行区分。
+// - 每个 slot 是什么类型（ FeedbackSlotKind ）
+// - 这个函数对应的 ClosureFeedbackCellArray 的长度是多少
+//
+// 很显然，FeedbackMetadata在JavaScript代码编译阶段被确定，
+// 主要服务于为JSFunction创建FeedbackVector、ClosureFeedbackCellArray等场景。
+// 参考：
+// - FeedbackVector::New()
+// - ClosureFeedbackCellArray::New()
 class FeedbackMetadata : public HeapObject {
  public:
   DECL_CAST(FeedbackMetadata)
