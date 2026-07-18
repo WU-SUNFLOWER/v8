@@ -97,6 +97,10 @@ extern class SharedFunctionInfo extends HeapObject {
   // - 每次函数被调用时，age字段都会被清零（见ResetSharedFunctionInfoAge）
   // - 当 age 达到一定阈值（bytecode_old_age）后，该函数的bytecode/baseline code就会从
   //   虚拟机堆内存中被释放掉。
+  // 参见：
+  // - MarkingVisitorBase<ConcreteVisitor>::VisitJSFunction()
+  // - MarkCompactCollector::ProcessFlushedBaselineCandidates()
+  // - JSFunction::ResetIfCodeFlushed()
   age: uint16;
   padding: uint16;
 }

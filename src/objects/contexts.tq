@@ -11,6 +11,8 @@ extern class Context extends HeapObject {
     return *ContextSlot(this, ContextSlot::SCOPE_INFO_INDEX);
   }
   const length: Smi;
+  // 槽位布局：[ScopeInfo, previous_context, ...]
+  // 参考src/objects/contexts.h
   elements[length]: Object;
 }
 

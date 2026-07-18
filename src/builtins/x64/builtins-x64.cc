@@ -1067,6 +1067,8 @@ void Builtins::Generate_InterpreterEntryTrampoline(
 #endif  // !V8_JITLESS
 
   __ bind(&push_stack_frame);
+  // 开始建立解释器栈帧
+  // 参考：https://v8.dev/blog/adaptor-frame
   FrameScope frame_scope(masm, StackFrame::MANUAL);
   __ pushq(rbp);  // Caller's frame pointer.
   __ movq(rbp, rsp);
@@ -2396,7 +2398,7 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
 
   StackArgumentsAccessor args(rax);
   __ AssertCallableFunction(rdi);
-
+  // 从JSFunction实例中取出绑定的SFI对象，放到rdi寄存器
   __ LoadTaggedField(rdx,
                      FieldOperand(rdi, JSFunction::kSharedFunctionInfoOffset));
   // ----------- S t a t e -------------
@@ -2408,6 +2410,7 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
   // Enter the context of the function; ToObject has to run in the function
   // context, and we also need to take the global proxy from the function
   // context in case of conversion.
+  // 从JSFunction实例中取出绑定的SFI对象，放到rsi寄存器，后面建帧时要用到
   __ LoadTaggedField(rsi, FieldOperand(rdi, JSFunction::kContextOffset));
   // We need to convert the receiver for non-native sloppy mode functions.
   Label done_convert;
