@@ -1495,6 +1495,29 @@ RUNTIME_FUNCTION(Runtime_GlobalPrint) {
   return string;
 }
 
+RUNTIME_FUNCTION(Runtime_PrintCurrentContext) {
+  SealHandleScope shs(isolate);
+  DCHECK_EQ(args.length(), 0);
+
+  JavaScriptStackFrameIterator it(isolate);
+  if (it.done()) {
+    PrintF("PrintCurrentContext: no JavaScript frame\n");
+    return ReadOnlyRoots(isolate).undefined_value();
+  }
+
+  Tagged<Object> raw_context = it.frame()->context();
+  if (!IsContext(raw_context)) {
+    PrintF("Current frame context slot is not a Context\n");
+    return ReadOnlyRoots(isolate).undefined_value();
+  }
+
+  Tagged<Context> context = Context::cast(raw_context);
+  PrintF("=== The Context of Current JavaScript Frame ===\n");
+  Print(context);
+
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
 RUNTIME_FUNCTION(Runtime_SystemBreak) {
   // The code below doesn't create handles, but when breaking here in GDB
   // having a handle scope might be useful.
