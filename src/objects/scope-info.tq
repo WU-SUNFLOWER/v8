@@ -12,9 +12,9 @@ extern enum ScopeType extends uint32 {
   // bit, so it doesn't matter what scope type it gets.
   CLASS_SCOPE,
   EVAL_SCOPE,
-  FUNCTION_SCOPE,  // 函数级作用域
+  FUNCTION_SCOPE,  // 函数级作用域，常用于实现闭包
   MODULE_SCOPE,
-  SCRIPT_SCOPE,  // 脚本级作用域
+  SCRIPT_SCOPE,  // 脚本级作用域（会触发创建新的Context对象，见src/execution/execution.cc的Invoke函数）
   CATCH_SCOPE,
   BLOCK_SCOPE,  // 块级作用域（不需要分配context数据结构）
   WITH_SCOPE,

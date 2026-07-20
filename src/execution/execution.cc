@@ -341,6 +341,10 @@ V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,
     }
 #endif
     // Set up a ScriptContext when running scripts that need it.
+    // 脚本顶层函数中显式声明全局变量，会导致其SFI的ScopeInfo被标记成SCRIPT_SCOPE，
+    // 那么需要显示创建一个新的Context对象（ScriptContext类型），
+    // 并将函数当前持有的Context对象（NativeContext）设置为其previous。
+    // 后续用let声明的全局变量会被保存进这个ScriptContext当中。
     if (function->shared()->needs_script_context()) {
       Handle<Context> context;
       Handle<FixedArray> host_defined_options =

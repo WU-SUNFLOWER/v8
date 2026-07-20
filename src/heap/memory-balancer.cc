@@ -23,6 +23,56 @@ void MemoryBalancer::RecomputeLimits(size_t embedder_allocation_limit,
   PostHeartbeatTask();
 }
 
+// Memory Balancer 根据应用的实际分配行为和 GC 性能，动态计算老生代
+// 下一次触发 Major GC 前所允许达到的内存上限。
+//
+// 核心模型：
+//
+//   limit = live + sqrt(live * allocation_rate / (gc_speed * c))
+//
+// 其中：
+//   - live：最近一次 Major GC 后仍然存活的老生代对象大小。
+//   - allocation_rate：应用向老生代分配内存的速度。
+//   - gc_speed：Major GC 回收/处理老生代内存的速度。
+//   - c：内存成本与 GC CPU 成本之间的权衡系数。
+//   - limit - live：下一次 Major GC 前允许使用的额外分配空间
+//                   （headroom）。
+//
+// 0                    Live                    Limit
+// |---------------------|-----------------------|
+//    仍然存活的对象          可继续分配的空闲额度
+// 该 limit 是动态的 GC 触发目标，并不是堆的绝对最大容量。
+//
+// 设计目标是在以下两种成本之间取得平衡：
+//   1. 预设的 headroom 太小：
+//      内存占用较低，但很快就会再次达到 limit，导致 Major GC
+//      过于频繁，严重时可能发生 GC thrashing。
+//
+//   2. 预设的 headroom 太大：
+//      Major GC 次数减少，但会保留大量暂时用不到的堆空间，
+//      增加进程的内存占用。
+//
+// 各输入量对结果的影响：
+//
+//   - live 越大：一次 Major GC 通常越昂贵，因此适当增加 headroom。
+//   - allocation_rate 越高：剩余空间消耗得越快，因此增加 headroom，
+//     避免因高分配率而频繁触发 GC。
+//   - gc_speed 越高：GC 可以更快完成，因此允许使用较小的 headroom，
+//     以更频繁的 GC 换取更低的内存占用。
+//   - c 越大：表示内存相对更“昂贵”，因此倾向于减小 headroom；
+//     c 越小，则更重视减少 GC CPU 开销，倾向于增大 headroom。
+//
+// 使用平方根可以使调整更加平缓：某个输入量即使增长数倍，headroom
+// 也不会按相同比例剧烈增长。例如 allocation_rate 增长 4 倍时，
+// 理论上的 headroom 只增长约 2 倍。
+//
+// 该策略相比仅根据 live 使用固定增长比例的方案，能够更好地处理：
+//
+//   - 小堆、高分配率应用：主动增加可分配空间，降低 GC 频率。
+//   - 大堆、低分配率应用：避免按固定比例预留过多内存，降低浪费。
+//
+// 最终计算出的 limit 还需要服从堆配置的最小值、最大值以及实现中的
+// 其他边界条件，避免除零、数值异常或超出实际允许的堆容量。
 void MemoryBalancer::RefreshLimit() {
   CHECK(major_allocation_rate_.has_value());
   CHECK(major_gc_speed_.has_value());

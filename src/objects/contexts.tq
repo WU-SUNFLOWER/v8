@@ -60,6 +60,25 @@ macro AllocateSyntheticFunctionContext(
   return result;
 }
 
+// NativeContext用于存放一套完整JavaScript世界的运行时环境。例如：
+// - 全局对象，比如这个世界里的 globalThis
+// - 内建对象/构造器，比如 Object 、 Array 、 Promise
+// - 原型链起点，比如 Array.prototype 、 Object.prototype
+// - 全局作用域环境
+// 注意：同一个 isolate 里可以有多个这样的世界
+//
+// 一个很直观的例子是chromium浏览器里的 iframe ：
+// 假设 iframe A 和 iframe B 同站，那么它们共享同一个 render 进程（及主线程），
+// 并且共享同一个 v8::Isolate，然而它们并不共享同一个 v8::Context
+//（即v8::internal::NativeContext）：
+// iframe A ─ v8::Context A ┐
+//                          ├─ 同一个 v8::Isolate / 同 Renderer 主线程
+// iframe B ─ v8::Context B ┘
+//
+// 也就是说：同一 Isolate ≠ 同一 JavaScript 全局环境
+// 
+// 注意区分Context和NativeContext的职责：
+// 前者是作为v8中内建设施的容器，后者是为了实现JavaScript中作用域链的语言功能而引入的。
 extern class NativeContext extends Context;
 
 type Slot<Container : type extends Context, T : type extends Object> extends

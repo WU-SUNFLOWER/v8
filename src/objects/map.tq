@@ -69,6 +69,11 @@ extern class Map extends HeapObject {
   @ifnot(TAGGED_SIZE_8_BYTES) optional_padding: void;
 
   prototype: JSReceiver|Null;
+  // - 对普通对象的根 Map ，它存 constructor ，也就是创建这类对象的构造函数，或 FunctionTemplateInfo 。
+  // - 对处在 transition tree 里的派生 Map ，它改存 back pointer ，指回父 Map ；
+  //   因为同一棵 transition tree 上的 map 共享同一个 constructor，
+  //   所以需要 constructor 时就沿 back pointer 往上找根 map。
+  // - 对 context map，它复用为 native_context 。
   constructor_or_back_pointer_or_native_context: Object;
   instance_descriptors: DescriptorArray;
   dependent_code: DependentCode;

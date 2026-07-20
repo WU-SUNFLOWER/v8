@@ -838,6 +838,7 @@ IGNITION_HANDLER(StaModuleVariable, InterpreterAssembler) {
 IGNITION_HANDLER(PushContext, InterpreterAssembler) {
   TNode<Context> new_context = CAST(GetAccumulator());
   TNode<Context> old_context = GetContext();
+  // 将旧context保存到字节码指令第一个参数所指定的寄存器当中
   StoreRegisterAtOperandIndex(old_context, 0);
   SetContext(new_context);
   Dispatch();
