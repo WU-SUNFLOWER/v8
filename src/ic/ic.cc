@@ -1623,6 +1623,8 @@ MaybeHandle<Object> StoreGlobalIC::Store(Handle<Name> name,
   Handle<ScriptContextTable> script_contexts(
       global->native_context()->script_context_table(), isolate());
 
+  // 遍历ScriptContextTable，看看这个变量名在之前的某个脚本中是否已经通过let/const声明过了。
+  // 如果已经通过let声明过了，那么直接将新的变量值覆写进对应脚本的ScriptContext的相应槽位中去。
   VariableLookupResult lookup_result;
   if (script_contexts->Lookup(str_name, &lookup_result)) {
     DisallowGarbageCollection no_gc;
@@ -1667,6 +1669,8 @@ MaybeHandle<Object> StoreGlobalIC::Store(Handle<Name> name,
     return value;
   }
 
+  // 否则说明当前要赋值的变量，是通过var声明的全局变量；或者是从来没有声明过的变量名
+  // 这种情况下直接把变量值挂到JSGlobalObject实例上去。
   return StoreIC::Store(global, name, value);
 }
 

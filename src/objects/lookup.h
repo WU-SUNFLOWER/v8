@@ -62,6 +62,7 @@ class V8_EXPORT_PRIVATE LookupIterator final {
 
   enum State {
     // 当前 holder 是“需要访问检查”的对象，查找前要先过安全检查。
+    // 例子：JSGlobalProxy实例
     ACCESS_CHECK,
     // 这次查找不是普通对象属性查找，
     // 而是落入 TypedArray 对整数索引的特殊规则里。

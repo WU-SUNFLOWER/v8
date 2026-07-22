@@ -1450,6 +1450,7 @@ void Genesis::HookUpGlobalProxy(Handle<JSGlobalProxy> global_proxy) {
   factory()->ReinitializeJSGlobalProxy(global_proxy, global_proxy_function);
   Handle<JSObject> global_object(
       JSObject::cast(native_context()->global_object()), isolate());
+  // 将JSGlobalProxy（即JavaScript世界的globalThis）的原型强制设置为JSGlobalObject实例
   JSObject::ForceSetPrototype(isolate(), global_proxy, global_object);
   global_proxy->set_native_context(*native_context());
   DCHECK(native_context()->global_proxy() == *global_proxy);
@@ -3488,6 +3489,8 @@ void Genesis::InitializeGlobal(Handle<JSGlobalObject> global_object,
   native_context()->set_embedder_data(*embedder_data);
 
   {  // -- g l o b a l T h i s
+     // V8将JSGlobalProxy实例暴露为JavaScript世界的globalThis（即浏览器里的window对象）
+     // 而JSGlobalObject才是真正的全局属性/全局变量容器。
     Handle<JSGlobalProxy> global_proxy(native_context()->global_proxy(),
                                        isolate_);
     JSObject::AddProperty(isolate_, global, factory->globalThis_string(),

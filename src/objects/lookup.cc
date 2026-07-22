@@ -97,7 +97,9 @@ void LookupIterator::Next() {
 
 template <bool is_element>
 void LookupIterator::NextInternal(Tagged<Map> map, Tagged<JSReceiver> holder) {
+  // 沿着原型链向上查找，直到找到目标属性，或遍历完整个原型链
   do {
+    // 调用NextHolder，通过map获取对象的原型
     Tagged<JSReceiver> maybe_holder = NextHolder(map);
     if (maybe_holder.is_null()) {
       if (interceptor_state_ == InterceptorState::kSkipNonMasking) {
@@ -1200,6 +1202,7 @@ bool LookupIterator::SkipInterceptor(Tagged<JSObject> holder) {
 
 Tagged<JSReceiver> LookupIterator::NextHolder(Tagged<Map> map) {
   DisallowGarbageCollection no_gc;
+  // JavaScript中原型链的终点（即Object.prototype）值为null
   if (map->prototype(isolate_) == ReadOnlyRoots(isolate_).null_value()) {
     return JSReceiver();
   }

@@ -164,13 +164,19 @@ RUNTIME_FUNCTION(Runtime_DeclareModuleExports) {
   return ReadOnlyRoots(isolate).undefined_value();
 }
 
+// JavaScript中使用var声明**全局**变量，
+// 或使用`function xxx() {}`的形式声明**全局**函数，
+// 会走这个Runtime API。
 RUNTIME_FUNCTION(Runtime_DeclareGlobals) {
   HandleScope scope(isolate);
   DCHECK_EQ(2, args.length());
 
+  // 全局变量声明信息数组
   Handle<FixedArray> declarations = args.at<FixedArray>(0);
+  // 执行全局变量声明的顶层JavaScript函数
   Handle<JSFunction> closure = args.at<JSFunction>(1);
 
+  // 实际会从NativeContext实例中取出JSGlobalObject对象
   Handle<JSGlobalObject> global(isolate->global_object());
   Handle<Context> context(isolate->context(), isolate);
 
@@ -186,46 +192,47 @@ RUNTIME_FUNCTION(Runtime_DeclareGlobals) {
 
   // Traverse the name/value pairs and set the properties.
   int length = declarations->length();
-  do {
-    int i = 0;
-    int for_with_handle_limit = i;
-    Isolate* for_with_handle_isolate = isolate;
-    while (i < length) {
-      for_with_handle_limit += 1024;
-      HandleScope loop_scope(for_with_handle_isolate);
-      for (; i < length && i < for_with_handle_limit; i++) {
-        {
-          Handle<Object> decl(declarations->get(i), isolate);
-          Handle<String> name;
-          Handle<Object> value;
-          bool is_var = IsString(*decl);
-          if (is_var) {
-            name = Handle<String>::cast(decl);
-            value = isolate->factory()->undefined_value();
-          } else {
-            Handle<SharedFunctionInfo> sfi =
-                Handle<SharedFunctionInfo>::cast(decl);
-            name = handle(sfi->Name(), isolate);
-            int index = Smi ::ToInt(declarations->get(++i));
-            Handle<FeedbackCell> feedback_cell(
-                closure_feedback_cell_array->get(index), isolate);
-            value = Factory ::JSFunctionBuilder(isolate, sfi, context)
-                        .set_feedback_cell(feedback_cell)
-                        .Build();
-          }
-          Tagged<Script> script = Script ::cast(closure->shared()->script());
-          PropertyAttributes attr =
-              script->compilation_type() == Script ::CompilationType ::kEval
-                  ? NONE
-                  : DONT_DELETE;
-          Tagged<Object> result =
-              DeclareGlobal(isolate, global, name, value, attr, is_var,
-                            RedeclarationType ::kSyntaxError);
-          if (isolate->has_pending_exception()) return result;
-        }
+  int i = 0;
+  int for_with_handle_limit = i;
+  while (i < length) {
+    for_with_handle_limit += 1024;
+
+    HandleScope loop_scope(isolate);
+    for (; i < length && i < for_with_handle_limit; i++) {
+      Handle<Object> decl(declarations->get(i), isolate);
+      Handle<String> name;
+      Handle<Object> value;
+      bool is_var = IsString(*decl);
+      if (is_var) {
+        // 全局变量，declarations[i]即为变量名
+        // 变量值稍后通过StaGlobal字节码存进去，这里先用undefined当作占位符
+        name = Handle<String>::cast(decl);
+        value = isolate->factory()->undefined_value();
+      } else {
+        // 全局函数，
+        // declarations[i]是其SFI；
+        // declarations[i+1]是closure_feedback_cell_array
+        // 中分配给该函数使用的feedback cell对象的下标。
+        Handle<SharedFunctionInfo> sfi = Handle<SharedFunctionInfo>::cast(decl);
+        name = handle(sfi->Name(), isolate);
+        int index = Smi ::ToInt(declarations->get(++i));
+        Handle<FeedbackCell> feedback_cell(
+            closure_feedback_cell_array->get(index), isolate);
+        value = Factory::JSFunctionBuilder(isolate, sfi, context)
+                    .set_feedback_cell(feedback_cell)
+                    .Build();
       }
+      Tagged<Script> script = Script::cast(closure->shared()->script());
+      PropertyAttributes attr =
+          script->compilation_type() == Script::CompilationType::kEval
+              ? NONE
+              : DONT_DELETE;
+      Tagged<Object> result =
+          DeclareGlobal(isolate, global, name, value, attr, is_var,
+                        RedeclarationType::kSyntaxError);
+      if (isolate->has_pending_exception()) return result;
     }
-  } while (false);
+  }
 
   return ReadOnlyRoots(isolate).undefined_value();
 }
