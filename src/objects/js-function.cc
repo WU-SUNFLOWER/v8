@@ -228,6 +228,8 @@ void JSFunction::MarkForOptimization(Isolate* isolate, CodeKind target_kind,
     }
   }
 
+  // 把目标编译级别和编译模式（在主线程编译还是在后台线程编译），
+  // 写进函数对应的feedback vector的flag字段当中
   set_tiering_state(TieringStateFor(target_kind, mode));
 }
 
