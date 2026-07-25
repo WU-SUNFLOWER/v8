@@ -1094,14 +1094,21 @@ void MacroAssembler::OptimizeCodeOrTailCallOptimizedCodeSlot(
         Immediate(FeedbackVector::kFlagsTieringStateIsAnyRequested));
   j(zero, &maybe_needs_logging);
 
+  // 如果函数已经被标记为"需要执行优化编译"，
+  // 进入runtime api执行优化编译任务。
+  // runtime api执行完毕后会返回一个 Code 对象，
+  // 然后直接 jump 进该 Code 对象持有的机器指令，开始执行。
   GenerateTailCallToReturnedCode(Runtime::kCompileOptimized, jump_mode);
 
+  // 如果没请求优化，再看 LogNextExecutionBit
+  // 如果要记日志，tail-call 到 Runtime::kFunctionLogNextExecution
   bind(&maybe_needs_logging);
   testw(FieldOperand(feedback_vector, FeedbackVector::kFlagsOffset),
         Immediate(FeedbackVector::LogNextExecutionBit::kMask));
   j(zero, &maybe_has_optimized_code);
   GenerateTailCallToReturnedCode(Runtime::kFunctionLogNextExecution, jump_mode);
 
+  // 否则从 maybe_optimized_code 槽里取出优化代码并尝试直接跳过去执行
   bind(&maybe_has_optimized_code);
   Register optimized_code_entry = kJavaScriptCallCodeStartRegister;
   LoadTaggedField(

@@ -1039,6 +1039,9 @@ void Builtins::Generate_InterpreterEntryTrampoline(
   __ j(not_equal, &compile_lazy);
 
   Label push_stack_frame;
+  // 加载JavaScript函数持有的feedback vector到rbx寄存器。
+  // 如果当前函数还没有feedback vector，
+  // 则直接跳转到push_stack_frame标签处建帧。
   Register feedback_vector = rbx;
   __ LoadFeedbackVector(feedback_vector, closure, &push_stack_frame,
                         Label::kNear);
@@ -1046,6 +1049,8 @@ void Builtins::Generate_InterpreterEntryTrampoline(
 #ifndef V8_JITLESS
   // If feedback vector is valid, check for optimized code and update invocation
   // count.
+  // 如果feedback vector被标记为需要执行tier-up编译任务，
+  // 那么跳转进flags_need_processing标签。
   Label flags_need_processing;
   __ CheckFeedbackVectorFlagsAndJumpIfNeedsProcessing(
       feedback_vector, CodeKind::INTERPRETED_FUNCTION, &flags_need_processing);
