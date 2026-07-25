@@ -1232,6 +1232,7 @@ Tagged<Context> Factory::NewContextInternal(Handle<Map> map, int size,
   Tagged<Context> context = Tagged<Context>::cast(result);
   context->set_length(variadic_part_length);
   DCHECK_EQ(context->SizeFromMap(*map), size);
+  // 用undefined填充多余槽位
   if (size > Context::kTodoHeaderSize) {
     ObjectSlot start = context->RawField(Context::kTodoHeaderSize);
     ObjectSlot end = context->RawField(size);
@@ -1272,6 +1273,8 @@ Handle<Context> Factory::NewScriptContext(Handle<NativeContext> outer,
                          Context::SizeFor(variadic_part_length),
                          variadic_part_length, AllocationType::kOld);
   DisallowGarbageCollection no_gc;
+  // ScriptContext的前两个槽位分别用来放ScopeInfo和previous context引用；
+  // 后续的variadic_part_length-2个槽位用来放通过let/const声明的全局变量。
   context->set_scope_info(*scope_info);
   context->set_previous(*outer);
   DCHECK(context->IsScriptContext());
