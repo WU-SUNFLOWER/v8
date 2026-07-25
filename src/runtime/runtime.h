@@ -491,6 +491,9 @@ namespace internal {
 #define FOR_EACH_INTRINSIC_TEMPORAL(F, I) \
   F(IsInvalidTemporalCalendarField, 2, 1)
 
+// F(RuntimeAPI的名称, number of arguments, number of return values)
+// number of arguments：api固定接收几个参数。-1表示接收参数数量不固定。
+// number of return values：api固定返回值数量。正常情况下都填1。
 #define FOR_EACH_INTRINSIC_TEST(F, I)         \
   F(Abort, 1, 1)                              \
   F(AbortCSADcheck, 1, 1)                     \
@@ -536,6 +539,7 @@ namespace internal {
   F(GetWeakCollectionSize, 1, 1)              \
   F(GlobalPrint, -1, 1)                       \
   F(PrintCurrentContext, 0, 1)                \
+  F(PrintSharedFunctionInfo, 1, 1)            \
   F(HasDictionaryElements, 1, 1)              \
   F(HasDoubleElements, 1, 1)                  \
   F(HasElementsInALargeObjectSpace, 1, 1)     \

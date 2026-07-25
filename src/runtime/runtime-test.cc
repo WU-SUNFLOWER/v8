@@ -1518,6 +1518,23 @@ RUNTIME_FUNCTION(Runtime_PrintCurrentContext) {
   return ReadOnlyRoots(isolate).undefined_value();
 }
 
+RUNTIME_FUNCTION(Runtime_PrintSharedFunctionInfo) {
+  HandleScope scope(isolate);
+  DCHECK_EQ(args.length(), 1);
+
+  Handle<Object> object = args.at(0);
+  if (!IsJSFunction(*object)) {
+    THROW_NEW_ERROR_RETURN_FAILURE(
+        isolate, NewTypeError(MessageTemplate::kNotCallable, object));
+  }
+
+  Handle<JSFunction> function = Handle<JSFunction>::cast(object);
+  PrintF("=== SharedFunctionInfo of JSFunction 0x%p ===\n", (*function).ptr());
+  Print(function->shared());
+
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
 RUNTIME_FUNCTION(Runtime_SystemBreak) {
   // The code below doesn't create handles, but when breaking here in GDB
   // having a handle scope might be useful.
