@@ -2587,6 +2587,8 @@ IGNITION_HANDLER(CreateCatchContext, InterpreterAssembler) {
 IGNITION_HANDLER(CreateFunctionContext, InterpreterAssembler) {
   TNode<UintPtrT> scope_info_idx = BytecodeOperandIdx(0);
   TNode<ScopeInfo> scope_info = CAST(LoadConstantPoolEntry(scope_info_idx));
+  // 字节码指令的第二个参数，表示新创建的FunctionContext中要预留几个槽位。
+  // 内嵌函数捕获几个闭包变量，预留的槽位数相应地就是几个。
   TNode<Uint32T> slots = BytecodeOperandUImm(1);
   TNode<Context> context = GetContext();
   ConstructorBuiltinsAssembler constructor_assembler(state());

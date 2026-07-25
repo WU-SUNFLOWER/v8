@@ -341,6 +341,11 @@ TNode<Context> ConstructorBuiltinsAssembler::FastNewFunctionContext(
     TNode<ScopeInfo> scope_info, TNode<Uint32T> slots, TNode<Context> context,
     ScopeType scope_type) {
   TNode<IntPtrT> slots_intptr = Signed(ChangeUint32ToWord(slots));
+  // size = 头部大小 + 槽位数 * 每个槽位的大小
+  // - 头部大小：Context::kTodoHeaderSize
+  // - 槽位数：slots_intptr
+  // - 每个槽位的大小：由 PACKED_ELEMENTS 决定
+  //   - PACKED_ELEMENTS可以解读为用于存放普通tagged value的槽位
   TNode<IntPtrT> size = ElementOffsetFromIndex(slots_intptr, PACKED_ELEMENTS,
                                                Context::kTodoHeaderSize);
 
@@ -360,6 +365,7 @@ TNode<Context> ConstructorBuiltinsAssembler::FastNewFunctionContext(
     default:
       UNREACHABLE();
   }
+  // 从native context中取出合适的给新建的context对象使用的map实例
   TNode<Map> map = CAST(LoadContextElement(native_context, index));
   // Set up the header.
   StoreMapNoWriteBarrier(function_context, map);

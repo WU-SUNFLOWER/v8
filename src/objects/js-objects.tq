@@ -101,12 +101,14 @@ macro AllocateFastOrSlowJSObjectFromMap(
       SlackTrackingMode::kWithSlackTracking);
 }
 
+// JSGlobalProxy::native_context字段指向拥有该JSGlobalProxy实例的NativeContext实例
 extern class JSGlobalProxy extends JSSpecialObject {
   // [native_context]: the owner native context of this global proxy object.
   // It is null value if this object is not used by any context.
   native_context: Object;
 }
 
+// JSGlobalObject::native_context字段指向拥有该JSGlobalObject实例的NativeContext实例
 extern class JSGlobalObject extends JSSpecialObject {
   // [native context]: the natives corresponding to this global object.
   native_context: NativeContext;

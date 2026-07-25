@@ -10151,7 +10151,9 @@ TNode<NativeContext> CodeStubAssembler::GetFunctionRealm(
   }
 
   BIND(&proxy_revoked);
-  { ThrowTypeError(context, MessageTemplate::kProxyRevoked, "apply"); }
+  {
+    ThrowTypeError(context, MessageTemplate::kProxyRevoked, "apply");
+  }
 
   BIND(&is_bound_function);
   {
@@ -11474,6 +11476,8 @@ TNode<IntPtrT> CodeStubAssembler::ElementOffsetFromIndex(
     return IntPtrConstant(base_size + element_size * index);
   }
 
+  // intptr_index左移element_size_shift位，
+  // 等价于intptr_index乘以2的element_size_shift次方
   TNode<IntPtrT> shifted_index =
       (element_size_shift == 0)
           ? intptr_index_node
@@ -11812,21 +11816,21 @@ void CodeStubAssembler::StoreElementTypedArrayBigInt(TNode<RawPtrT> elements,
 
   MachineRepresentation rep = WordT::kMachineRepresentation;
 #if defined(V8_TARGET_BIG_ENDIAN)
-    if (!Is64()) {
-      StoreNoWriteBarrier(rep, elements, offset, var_high.value());
-      StoreNoWriteBarrier(rep, elements,
-                          IntPtrAdd(offset, IntPtrConstant(kSystemPointerSize)),
-                          var_low.value());
-    } else {
-      StoreNoWriteBarrier(rep, elements, offset, var_low.value());
-    }
-#else
+  if (!Is64()) {
+    StoreNoWriteBarrier(rep, elements, offset, var_high.value());
+    StoreNoWriteBarrier(rep, elements,
+                        IntPtrAdd(offset, IntPtrConstant(kSystemPointerSize)),
+                        var_low.value());
+  } else {
     StoreNoWriteBarrier(rep, elements, offset, var_low.value());
-    if (!Is64()) {
-      StoreNoWriteBarrier(rep, elements,
-                          IntPtrAdd(offset, IntPtrConstant(kSystemPointerSize)),
-                          var_high.value());
-    }
+  }
+#else
+  StoreNoWriteBarrier(rep, elements, offset, var_low.value());
+  if (!Is64()) {
+    StoreNoWriteBarrier(rep, elements,
+                        IntPtrAdd(offset, IntPtrConstant(kSystemPointerSize)),
+                        var_high.value());
+  }
 #endif
 }
 
@@ -15134,10 +15138,14 @@ TNode<Boolean> CodeStubAssembler::InstanceOf(TNode<Object> object,
   }
 
   BIND(&if_notcallable);
-  { ThrowTypeError(context, MessageTemplate::kNonCallableInInstanceOfCheck); }
+  {
+    ThrowTypeError(context, MessageTemplate::kNonCallableInInstanceOfCheck);
+  }
 
   BIND(&if_notreceiver);
-  { ThrowTypeError(context, MessageTemplate::kNonObjectInInstanceOfCheck); }
+  {
+    ThrowTypeError(context, MessageTemplate::kNonObjectInInstanceOfCheck);
+  }
 
   BIND(&return_true);
   var_result = TrueConstant();
@@ -15767,7 +15775,9 @@ TNode<IntPtrT> CodeStubAssembler::RabGsabElementsKindToElementByteSize(
     Goto(&end);
   }
   BIND(&not_found);
-  { Unreachable(); }
+  {
+    Unreachable();
+  }
   BIND(&end);
   return result.value();
 }
@@ -16026,7 +16036,7 @@ TNode<BoolT> CodeStubAssembler::HasAsyncEventDelegate() {
 
 TNode<Uint32T> CodeStubAssembler::PromiseHookFlags() {
   return Load<Uint32T>(ExternalConstant(
-    ExternalReference::promise_hook_flags_address(isolate())));
+      ExternalReference::promise_hook_flags_address(isolate())));
 }
 
 TNode<BoolT> CodeStubAssembler::IsAnyPromiseHookEnabled(TNode<Uint32T> flags) {
@@ -16047,8 +16057,9 @@ TNode<BoolT> CodeStubAssembler::IsContextPromiseHookEnabled(
 }
 #endif
 
-TNode<BoolT> CodeStubAssembler::
-    IsIsolatePromiseHookEnabledOrHasAsyncEventDelegate(TNode<Uint32T> flags) {
+TNode<BoolT>
+CodeStubAssembler::IsIsolatePromiseHookEnabledOrHasAsyncEventDelegate(
+    TNode<Uint32T> flags) {
   uint32_t mask = Isolate::PromiseHookFields::HasIsolatePromiseHook::kMask |
                   Isolate::PromiseHookFields::HasAsyncEventDelegate::kMask;
   return IsSetWord32(flags, mask);
@@ -16110,19 +16121,19 @@ TNode<Code> CodeStubAssembler::GetSharedFunctionInfoCode(
   }
 
   int32_t case_values[] = {
-    BYTECODE_ARRAY_TYPE,
-    CODE_TYPE,
-    UNCOMPILED_DATA_WITHOUT_PREPARSE_DATA_TYPE,
-    UNCOMPILED_DATA_WITH_PREPARSE_DATA_TYPE,
-    UNCOMPILED_DATA_WITHOUT_PREPARSE_DATA_WITH_JOB_TYPE,
-    UNCOMPILED_DATA_WITH_PREPARSE_DATA_AND_JOB_TYPE,
-    FUNCTION_TEMPLATE_INFO_TYPE,
+      BYTECODE_ARRAY_TYPE,
+      CODE_TYPE,
+      UNCOMPILED_DATA_WITHOUT_PREPARSE_DATA_TYPE,
+      UNCOMPILED_DATA_WITH_PREPARSE_DATA_TYPE,
+      UNCOMPILED_DATA_WITHOUT_PREPARSE_DATA_WITH_JOB_TYPE,
+      UNCOMPILED_DATA_WITH_PREPARSE_DATA_AND_JOB_TYPE,
+      FUNCTION_TEMPLATE_INFO_TYPE,
 #if V8_ENABLE_WEBASSEMBLY
-    WASM_CAPI_FUNCTION_DATA_TYPE,
-    WASM_EXPORTED_FUNCTION_DATA_TYPE,
-    WASM_JS_FUNCTION_DATA_TYPE,
-    ASM_WASM_DATA_TYPE,
-    WASM_RESUME_DATA_TYPE,
+      WASM_CAPI_FUNCTION_DATA_TYPE,
+      WASM_EXPORTED_FUNCTION_DATA_TYPE,
+      WASM_JS_FUNCTION_DATA_TYPE,
+      ASM_WASM_DATA_TYPE,
+      WASM_RESUME_DATA_TYPE,
 #endif  // V8_ENABLE_WEBASSEMBLY
   };
   Label check_is_bytecode_array(this);
@@ -16134,19 +16145,19 @@ TNode<Code> CodeStubAssembler::GetSharedFunctionInfoCode(
   Label check_is_wasm_function_data(this);
   Label check_is_wasm_resume(this);
   Label* case_labels[] = {
-    &check_is_bytecode_array,
-    &check_is_baseline_data,
-    &check_is_uncompiled_data,
-    &check_is_uncompiled_data,
-    &check_is_uncompiled_data,
-    &check_is_uncompiled_data,
-    &check_is_function_template_info,
+      &check_is_bytecode_array,
+      &check_is_baseline_data,
+      &check_is_uncompiled_data,
+      &check_is_uncompiled_data,
+      &check_is_uncompiled_data,
+      &check_is_uncompiled_data,
+      &check_is_function_template_info,
 #if V8_ENABLE_WEBASSEMBLY
-    &check_is_wasm_function_data,
-    &check_is_wasm_function_data,
-    &check_is_wasm_function_data,
-    &check_is_asm_wasm_data,
-    &check_is_wasm_resume,
+      &check_is_wasm_function_data,
+      &check_is_wasm_function_data,
+      &check_is_wasm_function_data,
+      &check_is_asm_wasm_data,
+      &check_is_wasm_resume,
 #endif  // V8_ENABLE_WEBASSEMBLY
   };
   static_assert(arraysize(case_values) == arraysize(case_labels));
