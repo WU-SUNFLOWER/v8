@@ -4089,6 +4089,7 @@ void Compiler::FinalizeMaglevCompilationJob(maglev::MaglevCompilationJob* job,
 
     Handle<Code> code = job->code().ToHandleChecked();
     if (!job->is_osr()) {
+      // 将maglev编译完成的Code对象安装到JavaScript函数对象实例上去
       job->function()->set_code(*code);
     }
 
