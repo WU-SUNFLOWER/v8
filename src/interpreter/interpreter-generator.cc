@@ -2585,9 +2585,11 @@ IGNITION_HANDLER(CreateCatchContext, InterpreterAssembler) {
 //
 // Creates a new context with number of |slots| for the function closure.
 IGNITION_HANDLER(CreateFunctionContext, InterpreterAssembler) {
+  // 字节码指令的第1个参数，表示与新创建的Context绑定的ScopeInfo在SFI常量池中的下标
+  // 这个ScopeInfo对象，亦是创建闭包的外层函数的SFI中scope_info字段所指者
   TNode<UintPtrT> scope_info_idx = BytecodeOperandIdx(0);
   TNode<ScopeInfo> scope_info = CAST(LoadConstantPoolEntry(scope_info_idx));
-  // 字节码指令的第二个参数，表示新创建的FunctionContext中要预留几个槽位。
+  // 字节码指令的第2个参数，表示新创建的FunctionContext中要预留几个槽位。
   // 内嵌函数捕获几个闭包变量，预留的槽位数相应地就是几个。
   TNode<Uint32T> slots = BytecodeOperandUImm(1);
   TNode<Context> context = GetContext();

@@ -63,6 +63,7 @@ extern class SharedFunctionInfo extends HeapObject {
   //   之后才可能被安装到某个 JSFunction::code 上。
   @customWeakMarking function_data: Object;
   name_or_scope_info: String|NoSharedNameSentinel|ScopeInfo;
+  // 指向外层作用域对应的ScopeInfo
   outer_scope_info_or_feedback_metadata: HeapObject;
   script: Script|Undefined;
   // [length]: The function length - usually the number of declared parameters
