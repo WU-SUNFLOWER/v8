@@ -350,6 +350,7 @@ RUNTIME_FUNCTION(Runtime_StackGuard) {
     return isolate->StackOverflow();
   }
 
+  DCHECK(check.InterruptRequested());
   return isolate->stack_guard()->HandleInterrupts(
       StackGuard::InterruptLevel::kAnyEffect);
 }
@@ -365,6 +366,7 @@ RUNTIME_FUNCTION(Runtime_HandleNoHeapWritesInterrupts) {
     return isolate->StackOverflow();
   }
 
+  DCHECK(check.InterruptRequested());
   return isolate->stack_guard()->HandleInterrupts(
       StackGuard::InterruptLevel::kNoHeapWrites);
 }
@@ -381,6 +383,7 @@ RUNTIME_FUNCTION(Runtime_StackGuardWithGap) {
     return isolate->StackOverflow();
   }
 
+  DCHECK(check.InterruptRequested());
   return isolate->stack_guard()->HandleInterrupts(
       StackGuard::InterruptLevel::kAnyEffect);
 }
