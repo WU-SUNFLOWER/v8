@@ -195,6 +195,8 @@ class V8_EXPORT_PRIVATE V8_NODISCARD StackGuard final {
     // fail. Both the generated code and the runtime system check against the
     // one without the real_ prefix.
 
+    // real_jslimit_、real_climit_用于检测JavaScript运行过程中虚拟机是否真的发生了栈溢出，
+    // 在VM运行过程中一般不可变。
     // Actual JavaScript stack limit set for the VM.
     uintptr_t real_jslimit_ = kIllegalLimit;
     // Actual C++ stack limit set for the VM.
@@ -202,6 +204,9 @@ class V8_EXPORT_PRIVATE V8_NODISCARD StackGuard final {
 
     // jslimit_ and climit_ can be read without any lock.
     // Writing requires the ExecutionAccess lock.
+    // jslimit_、climit_在VM运行过程中可变。
+    // 在适当的时候，VM可以将它们的值修改为kInterruptLimit（rsp的值一定会小于它），
+    // 以触发中断。
     base::AtomicWord jslimit_ = kIllegalLimit;
     base::AtomicWord climit_ = kIllegalLimit;
 

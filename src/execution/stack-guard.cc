@@ -155,6 +155,7 @@ bool StackGuard::CheckInterrupt(InterruptFlag flag) {
 }
 
 void StackGuard::RequestInterrupt(InterruptFlag flag) {
+  // 更新中断之前，要先申请互斥锁
   ExecutionAccess access(isolate_);
   // Check the chain of InterruptsScope for interception.
   if (thread_local_.interrupt_scopes_ &&
@@ -163,6 +164,7 @@ void StackGuard::RequestInterrupt(InterruptFlag flag) {
   }
 
   // Not intercepted.  Set as active interrupt flag.
+  // 更新中断标志位interrupt_flags_
   thread_local_.interrupt_flags_ |= flag;
   update_interrupt_requests_and_stack_limits(access);
 
@@ -281,6 +283,15 @@ class V8_NODISCARD ShouldBeZeroOnReturnScope final {
 
 }  // namespace
 
+// v8中实际存在着两套被称为"interrupt"的机制。
+// - 一套是靠函数feedback cell中interrupt_budget驱动的。
+// - 另一套是靠StackGuard负责维护的climit和jslimit驱动的。
+//
+// - 前者主要回答了检查JavaScript函数需要进行tiering up的时机的问题；
+// - 而后者则回答了JavaScript主线程执行过程中，什么时候检查后台线程中的任务
+//  （例如baseline和maglev编译）执行完毕的问题。
+//
+// 两者是不同层次的概念，不能混为一谈。
 Tagged<Object> StackGuard::HandleInterrupts(InterruptLevel level) {
   TRACE_EVENT0("v8.execute", "V8.HandleInterrupts");
 

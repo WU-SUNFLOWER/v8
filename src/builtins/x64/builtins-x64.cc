@@ -1105,6 +1105,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(
                               BytecodeArray::kFrameSizeOffset));
 
     // Do a stack check to ensure we don't go over the limit.
+    // 检测是否发生了真的栈溢出
     __ movq(rax, rsp);
     __ subq(rax, rcx);
     __ cmpq(rax, __ StackLimitAsOperand(StackLimitKind::kRealStackLimit));

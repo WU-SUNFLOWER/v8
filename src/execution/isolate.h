@@ -1534,9 +1534,13 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
     default_locale_ = locale;
   }
 
-  enum class ICUObjectCacheType{
-      kDefaultCollator, kDefaultNumberFormat, kDefaultSimpleDateFormat,
-      kDefaultSimpleDateFormatForTime, kDefaultSimpleDateFormatForDate};
+  enum class ICUObjectCacheType {
+    kDefaultCollator,
+    kDefaultNumberFormat,
+    kDefaultSimpleDateFormat,
+    kDefaultSimpleDateFormatForTime,
+    kDefaultSimpleDateFormatForDate
+  };
   static constexpr int kICUObjectCacheTypeCount = 5;
 
   icu::UMemory* get_cached_icu_object(ICUObjectCacheType cache_type,
@@ -2727,6 +2731,8 @@ class StackLimitCheck {
   // Use this to check for interrupt request in C++ code.
   V8_INLINE bool InterruptRequested() {
     StackGuard* stack_guard = isolate_->stack_guard();
+    // 如果InterruptRequested()成立，那么此时
+    // stack_guard->climit()应为kInterruptLimit（取值为0xFFFFFFFFFFFFFFFE）
     return GetCurrentStackPosition() < stack_guard->climit();
   }
 

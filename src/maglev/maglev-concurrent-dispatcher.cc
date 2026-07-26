@@ -268,6 +268,7 @@ class MaglevConcurrentDispatcher::JobTask final : public v8::JobTask {
             job->ExecuteJob(local_isolate.runtime_call_stats(), &local_isolate);
         if (status == CompilationJob::SUCCEEDED) {
           outgoing_queue()->Enqueue(std::move(job));
+          // 编译任务完成，设置中断
           isolate()->stack_guard()->RequestInstallMaglevCode();
         }
       } else if (destruction_queue()->Dequeue(&job)) {
