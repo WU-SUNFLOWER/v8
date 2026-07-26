@@ -416,6 +416,10 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ movq(Operand(rbp, kOffsetToContextSlot), kScratchRegister);
 
   // If this is the outermost JS call, set js_entry_sp value.
+  // 如果 js_entry_sp == 0，表明本次是最外层的
+  // 从C++世界进入JavaScript世界的调用。
+  // 这时就把指向当前 Builtins_JSEntry 栈帧栈底（同时也是C++世界
+  // 和JavaScript世界堆栈的分界线）的rbp寄存器的值保存进 js_entry_sp。
   ExternalReference js_entry_sp = ExternalReference::Create(
       IsolateAddressId::kJSEntrySPAddress, masm->isolate());
   __ Load(rax, js_entry_sp);
