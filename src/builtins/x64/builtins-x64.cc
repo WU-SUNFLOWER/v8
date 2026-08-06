@@ -682,9 +682,11 @@ static void GetSharedFunctionInfoBytecodeOrBaseline(MacroAssembler* masm,
                                                     Label* is_baseline) {
   ASM_CODE_COMMENT(masm);
   Label done;
+  // 获取 sfi_data 寄存器中所存对象的 Map，存入 scratch1 寄存器
   __ LoadMap(scratch1, sfi_data);
 
 #ifndef V8_JITLESS
+  // 如果 sfi_data 是一个 Code 对象，则直接跳转进 is_baseline 标签
   __ CmpInstanceType(scratch1, CODE_TYPE);
   if (v8_flags.debug_code) {
     Label not_baseline;
@@ -700,6 +702,8 @@ static void GetSharedFunctionInfoBytecodeOrBaseline(MacroAssembler* masm,
   __ CmpInstanceType(scratch1, INTERPRETER_DATA_TYPE);
   __ j(not_equal, &done, Label::kNear);
 
+  // 如果 sfi_data 是一个 InterpreterData 对象，
+  // 从中取出实际的 bytecode_array，存回 sfi_data 寄存器。
   __ LoadTaggedField(
       sfi_data, FieldOperand(sfi_data, InterpreterData::kBytecodeArrayOffset));
 
@@ -1025,6 +1029,8 @@ void Builtins::Generate_InterpreterEntryTrampoline(
       shared_function_info,
       FieldOperand(closure, JSFunction::kSharedFunctionInfoOffset));
   ResetSharedFunctionInfoAge(masm, shared_function_info);
+  // 将函数对应 SFI 对象的 function_data 字段存入
+  // kInterpreterBytecodeArrayRegister 寄存器
   __ LoadTaggedField(kInterpreterBytecodeArrayRegister,
                      FieldOperand(shared_function_info,
                                   SharedFunctionInfo::kFunctionDataOffset));

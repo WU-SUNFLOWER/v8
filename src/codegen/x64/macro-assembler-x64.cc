@@ -1108,7 +1108,7 @@ void MacroAssembler::OptimizeCodeOrTailCallOptimizedCodeSlot(
   j(zero, &maybe_has_optimized_code);
   GenerateTailCallToReturnedCode(Runtime::kFunctionLogNextExecution, jump_mode);
 
-  // 否则从 maybe_optimized_code 槽里取出优化代码并尝试直接跳过去执行
+  // 否则从feedback_vector的maybe_optimized_code槽里取出优化代码并尝试直接跳过去执行
   bind(&maybe_has_optimized_code);
   Register optimized_code_entry = kJavaScriptCallCodeStartRegister;
   LoadTaggedField(
