@@ -35,6 +35,7 @@
 #ifdef V8_ENABLE_MAGLEV
 #include "src/maglev/maglev-concurrent-dispatcher.h"
 #endif  // V8_ENABLE_MAGLEV
+#include "src/base/platform/platform.h"
 #include "src/objects/js-atomics-synchronization-inl.h"
 #include "src/objects/js-function-inl.h"
 #include "src/objects/js-regexp-inl.h"
@@ -2183,6 +2184,27 @@ RUNTIME_FUNCTION(Runtime_GetWeakCollectionSize) {
 
   return Smi::FromInt(
       EphemeronHashTable::cast(collection->table())->NumberOfElements());
+}
+
+// 让JavaScript主线程沉睡一定
+// 便于等待后台线程任务（如baseline/optimize jit）完成。
+RUNTIME_FUNCTION(Runtime_DebugSleep) {
+  HandleScope scope(isolate);
+
+  if (args.length() != 1) {
+    return CrashUnlessFuzzing(isolate);
+  }
+
+  Handle<Object> arg = args.at(0);
+  if (!IsNumber(*arg)) {
+    THROW_NEW_ERROR_RETURN_FAILURE(
+        isolate, NewTypeError(MessageTemplate::kNotFiniteNumber, arg));
+  }
+
+  auto interval = base::TimeDelta::FromMilliseconds(NumberToInt64(*arg));
+  base::OS::Sleep(interval);
+
+  return ReadOnlyRoots(isolate).undefined_value();
 }
 
 }  // namespace internal

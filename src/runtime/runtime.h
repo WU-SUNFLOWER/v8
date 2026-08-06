@@ -522,6 +522,7 @@ namespace internal {
   F(DebugPrintFloat, 5, 1)                    \
   F(DebugPrintPtr, 1, 1)                      \
   F(DebugPrintWord, 5, 1)                     \
+  F(DebugSleep, 1, 1)                         \
   F(DebugTrace, 0, 1)                         \
   F(DebugTrackRetainingPath, -1, 1)           \
   F(DeoptimizeFunction, 1, 1)                 \
