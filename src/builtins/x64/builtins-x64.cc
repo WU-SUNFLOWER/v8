@@ -1060,6 +1060,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(
   // If feedback vector is valid, check for optimized code and update invocation
   // count.
   // 如果feedback vector被标记为需要执行tier-up编译任务，
+  // 或者已经有编译好的maglev/turbofan 代码，
   // 那么跳转进flags_need_processing标签。
   Label flags_need_processing;
   __ CheckFeedbackVectorFlagsAndJumpIfNeedsProcessing(
@@ -1252,13 +1253,15 @@ void Builtins::Generate_InterpreterEntryTrampoline(
     Label install_baseline_code;
     // Check if feedback vector is valid. If not, call prepare for baseline to
     // allocate it.
+    // 先检查函数是否已经拥有有效的feedback vector。
+    // 如果没有则直接走慢速路径。
     __ IsObjectType(feedback_vector, FEEDBACK_VECTOR_TYPE, rcx);
     __ j(not_equal, &install_baseline_code);
 
     // Check the tiering state.
-    // 检查feedback vector的maybe_optimized_code字段中
-    // 是否已有maglev/turbofan生成的优化代码。
-    // 如果有就跳转过去执行，不走baseline code了。
+    // 如果feedback vector被标记为需要执行tier-up编译任务，
+    // 或者已经有编译好的maglev/turbofan 代码，
+    // 那么跳转进flags_need_processing标签。
     __ CheckFeedbackVectorFlagsAndJumpIfNeedsProcessing(
         feedback_vector, CodeKind::BASELINE, &flags_need_processing);
 
@@ -1269,8 +1272,11 @@ void Builtins::Generate_InterpreterEntryTrampoline(
     __ ReplaceClosureCodeWithOptimizedCode(
         rcx, closure, kInterpreterBytecodeArrayRegister,
         WriteBarrierDescriptor::SlotAddressRegister());
+    // 快速路径：直接跳转进baseline code执行
     __ JumpCodeObject(rcx);
 
+    // 慢速路径：先进runtime为函数初始化feedback vector，再跳转进baseline
+    // code执行
     __ bind(&install_baseline_code);
     __ GenerateTailCallToReturnedCode(Runtime::kInstallBaselineCode);
   }

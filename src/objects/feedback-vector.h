@@ -234,6 +234,7 @@ class FeedbackVector
   static constexpr uint32_t kFlagsHasAnyOptimizedCode =
       FeedbackVector::MaybeHasMaglevCodeBit::kMask |
       FeedbackVector::MaybeHasTurbofanCodeBit::kMask;
+  // 这个掩码值和src/common/globals.h里边的TIERING_STATE_LIST是对应的
   static constexpr uint32_t kFlagsTieringStateIsAnyRequested =
       kNoneOrInProgressMask << FeedbackVector::TieringStateBits::kShift;
   static constexpr uint32_t kFlagsLogNextExecution =

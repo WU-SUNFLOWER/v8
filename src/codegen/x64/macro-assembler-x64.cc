@@ -2728,6 +2728,8 @@ void MacroAssembler::CallCodeObject(Register code_object) {
 }
 
 void MacroAssembler::JumpCodeObject(Register code_object, JumpMode jump_mode) {
+  // 将 Code 对象内部保存的指令首地址（instruction start offset）取出，
+  // 写回code_object寄存器。
   LoadCodeInstructionStart(code_object, code_object);
   switch (jump_mode) {
     case JumpMode::kJump:
