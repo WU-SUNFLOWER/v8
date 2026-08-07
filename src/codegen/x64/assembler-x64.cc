@@ -1123,6 +1123,7 @@ void Assembler::call(Register adr) {
 void Assembler::call(Operand op) {
   EnsureSpace ensure_space(this);
   // Opcode: FF /2 m64.
+  // 表示执行间接调用（Indirect Call），适用于运行时才能知道调用目标的场景
   emit_optional_rex_32(op);
   emit(0xFF);
   emit_operand(0x2, op);
