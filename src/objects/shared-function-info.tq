@@ -71,6 +71,8 @@ extern class SharedFunctionInfo extends HeapObject {
   // Use up to 2^16-2 parameters (16 bits of values, where one is reserved for
   // kDontAdaptArgumentsSentinel). The value is only reliable when the function
   // has been compiled.
+  // JavaScript函数形参的个数。
+  // JavaScript层面读取`function.length`，最终就会读取这个字段的值。
   length: int16;
   // [formal_parameter_count]: The number of declared parameters (or the special
   // value kDontAdaptArgumentsSentinel to indicate that arguments are passed
