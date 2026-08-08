@@ -1310,6 +1310,39 @@ RUNTIME_FUNCTION(Runtime_DebugPrintProto) {
   return args[0];
 }
 
+RUNTIME_FUNCTION(Runtime_DebugPrintProtoChain) {
+  HandleScope scope(isolate);
+  DisallowGarbageCollection no_gc;
+
+  if (args.length() < 1 || args.length() > 2) {
+    return CrashUnlessFuzzing(isolate);
+  }
+
+  if (!IsJSReceiver(args[0])) {
+    return CrashUnlessFuzzing(isolate);
+  }
+  auto object = args.at<JSReceiver>(0);
+
+  bool show_map_object = true;
+  if (args.length() == 2) {
+    if (!IsBoolean(args[1])) {
+      return CrashUnlessFuzzing(isolate);
+    }
+    show_map_object = IsTrue(args[1]);
+  }
+
+  PrototypeIterator iter(isolate, object, kStartAtReceiver);
+  for (; !iter.IsAtEnd(); iter.Advance()) {
+    auto current = PrototypeIterator::GetCurrent(iter);
+    Print(*current);
+    if (show_map_object) {
+      Print(current->map());
+    }
+  }
+
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
 RUNTIME_FUNCTION(Runtime_DebugPrintSimply) {
   HandleScope shs(isolate);
 
