@@ -47,6 +47,10 @@ extern class JSFunction extends JSFunctionOrBoundFunctionOrWrappedFunction {
   context: Context;
   feedback_cell: FeedbackCell;
   // Space for the following field may or may not be allocated.
+  //
+  // **prototype_or_initial_map是可选的，在分配JSFunction时不一定会预留！！！**
+  // **对于不支持被new运算符作用的JavaScript函数（例如箭头函数），就没有这个字段！！！**
+  //
   // prototype_or_initial_map可能指向一个JavaScript原型对象，也有可能指向一个供new出来的对象指向的Map对象。
   // 例子：
   // ```JavaScript

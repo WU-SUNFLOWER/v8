@@ -11,7 +11,15 @@ bitfield struct MapBitFields1 extends uint8 {
   has_indexed_interceptor: bool: 1 bit;
   is_undetectable: bool: 1 bit;
   is_access_check_needed: bool: 1 bit;
+  // 标记该Map对象代表的类型的实例，是否支持被new运算符作用
   is_constructor: bool: 1 bit;
+  // 标记该Map对象代表的类型的实例，是否有
+  // prototype_or_initial_map 槽位。
+  //
+  // 对于非 JSFunction 类型体系的 Map ，has_prototype_slot 
+  // 这个 bit 基本上确实没有业务语义，通常一直是 false。
+  // 但它放在 Map 的统一 bitfield 里， 几乎不增加实际对象大小成本。
+  // 这是 V8 设计中一个很小、很刻意的 trade-off。
   has_prototype_slot: bool: 1 bit;
 }
 
