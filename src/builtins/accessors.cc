@@ -313,6 +313,8 @@ Handle<AccessorInfo> Accessors::MakeStringLengthInfo(Isolate* isolate) {
 
 static Handle<Object> GetFunctionPrototype(Isolate* isolate,
                                            Handle<JSFunction> function) {
+  // 如果当前函数对象function还没有分配，JS代码就尝试访问function.prototype，
+  // 那么首先就需要先进行分配。
   if (!function->has_prototype()) {
     // We lazily allocate .prototype for functions, which confuses debug
     // evaluate which assumes we can write to temporary objects we allocated
@@ -352,6 +354,8 @@ void Accessors::FunctionPrototypeSetter(
   info.GetReturnValue().Set(true);
 }
 
+// 创建处理函数prototype属性读写的AccessorInfo对象。
+// 这个方法只有在mksnapshot.exe中才会被调用。
 Handle<AccessorInfo> Accessors::MakeFunctionPrototypeInfo(Isolate* isolate) {
   return MakeAccessor(isolate, isolate->factory()->prototype_string(),
                       &FunctionPrototypeGetter, &FunctionPrototypeSetter);
