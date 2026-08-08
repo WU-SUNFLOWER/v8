@@ -78,6 +78,8 @@ extern class Map extends HeapObject {
   @if(TAGGED_SIZE_8_BYTES) optional_padding: uint32;
   @ifnot(TAGGED_SIZE_8_BYTES) optional_padding: void;
 
+  // 指向原型链中更上一级的JS对象
+  // （即持有当前Map的JS对象的__proto__）。
   prototype: JSReceiver|Null;
   // - 对普通对象的根 Map ，它存 constructor ，也就是创建这类对象的构造函数，或 FunctionTemplateInfo 。
   // - 对处在 transition tree 里的派生 Map ，它改存 back pointer ，指回父 Map ；
