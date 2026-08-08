@@ -3323,9 +3323,9 @@ void CodeStubAssembler::BranchIfHasPrototypeProperty(
 }
 
 void CodeStubAssembler::GotoIfPrototypeRequiresRuntimeLookup(
-    TNode<JSFunction> function, TNode<Map> map, Label* runtime) {
+    TNode<JSFunction> function, TNode<Map> function_self_map, Label* runtime) {
   // !has_prototype_property() || has_non_instance_prototype()
-  TNode<Int32T> map_bit_field = LoadMapBitField(map);
+  TNode<Int32T> map_bit_field = LoadMapBitField(function_self_map);
   Label next_check(this);
   BranchIfHasPrototypeProperty(function, map_bit_field, &next_check, runtime);
   BIND(&next_check);
@@ -3340,12 +3340,17 @@ TNode<HeapObject> CodeStubAssembler::LoadJSFunctionPrototype(
                        LoadMapBitField(LoadMap(function))));
   TNode<HeapObject> proto_or_map = LoadObjectField<HeapObject>(
       function, JSFunction::kPrototypeOrInitialMapOffset);
+  // 如果JSFunction的prototype_or_initial_map字段尚未初始化（占位值为hole），
+  // 直接回退到runtime慢速路径。
+  Print(proto_or_map);
   GotoIf(IsTheHole(proto_or_map), if_bailout);
 
   TVARIABLE(HeapObject, var_result, proto_or_map);
   Label done(this, &var_result);
   GotoIfNot(IsMap(proto_or_map), &done);
 
+  // 如果JSFunction的prototype_or_initial_map字段存的是Map对象，
+  // 那么就从Map对象的当中去取。
   var_result = LoadMapPrototype(CAST(proto_or_map));
   Goto(&done);
 
@@ -10629,6 +10634,11 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
   }
 
   // AccessorInfo case.
+  // 对于需要走AccessorInfo访问的属性，
+  // 例如 array.length、function.prototype、 string.length），
+  // V8在快速路径中并不会真的进入相应getter的C++代码执行访问操作，
+  // 而是直接将获取操作**硬编码**进CSA快速路径，并通过 holder 的
+  // 类型（holder_instance_type）进行派发。
   BIND(&if_accessor_info);
   {
     TNode<AccessorInfo> accessor_info = CAST(value);
@@ -10663,6 +10673,8 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
                 if_bailout);
 
       TNode<JSFunction> function = CAST(holder);
+      // 如果当前JSFunction中没有有效的prototype对象可以取，
+      // 这里就会退回runtime慢速路径（if_bailout）。
       GotoIfPrototypeRequiresRuntimeLookup(function, holder_map, if_bailout);
       var_value = LoadJSFunctionPrototype(function, if_bailout);
       Goto(&done);

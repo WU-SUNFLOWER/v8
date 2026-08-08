@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 bitfield struct MapBitFields1 extends uint8 {
+  // 标记当前Map对象中没有有效的prototype
+  // 可以提供给持有该Map的实例对象
   has_non_instance_prototype: bool: 1 bit;
   is_callable: bool: 1 bit;
   has_named_interceptor: bool: 1 bit;

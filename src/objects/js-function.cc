@@ -768,6 +768,7 @@ void JSFunction::SetPrototype(Handle<JSFunction> function,
         isolate);
   } else {
     construct_prototype = Handle<JSReceiver>::cast(value);
+    // 标记JSFunction持有的map对象：已经具备可供持有该Map的实例对象使用的prototype对象
     function->map()->set_has_non_instance_prototype(false);
   }
 
