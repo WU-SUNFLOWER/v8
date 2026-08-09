@@ -17,6 +17,16 @@ namespace baseline {
 class BaselineCompiler;
 class ConcurrentBaselineCompiler;
 
+// jit涉及到对页表项rwx状态的操作，需要走系统调用进内核态
+// （输出代码时先把内存页设置为可写，jit代码生成后需要再设置为可执行）。
+// V8 为了减少反复进入内核态的开销，将 baseline jit 任务推迟为批处理执行。
+//
+// 详细见：https://github.com/v8/v8/commit/6ff1129ca37e3e618db1b594452da793331a2f28
+//
+// 这也从一个侧面说明：
+// V8中的baseline jit相对没有那么紧急和重要，可以延迟进行批处理。
+// 但一个功能都活到maglev了，那一定是很活跃的长久任务，那还是尽早优化。
+// 因此maglev jit没有类似的批处理设计。
 class BaselineBatchCompiler {
  public:
   static const int kInitialQueueSize = 32;
