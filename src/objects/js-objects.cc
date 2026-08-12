@@ -3989,6 +3989,12 @@ void JSObject::MigrateSlowToFast(Handle<JSObject> object,
       new_map->set_may_have_interesting_properties(true);
     }
 
+    // 对于普通 dictionary-mode JavaScript 对象：
+    // - 数据属性（kData）的值，直接存储在 dictionary entry 的 value 中。
+    // - accessor 属性（kAccessor）的 AccessorPair 等对象，也直接存储在
+    //   dictionary entry 的 value 中。
+    //
+    // 也就是说，这些属性的 location() 都固定为 PropertyLocation::kField
     DCHECK_EQ(PropertyLocation::kField, details.location());
     DCHECK_IMPLIES(!V8_DICT_PROPERTY_CONST_TRACKING_BOOL,
                    details.constness() == PropertyConstness::kMutable);
@@ -4032,6 +4038,8 @@ void JSObject::MigrateSlowToFast(Handle<JSObject> object,
   descriptors->Sort();
 
   DisallowGarbageCollection no_gc;
+  // 将 descriptor array 安装到新建 map 当中，
+  // 并且初始化新建 map 的 number_of_own_descriptors 字段。
   new_map->InitializeDescriptors(isolate, *descriptors);
   if (number_of_allocated_fields == 0) {
     new_map->SetInObjectUnusedPropertyFields(unused_property_fields);

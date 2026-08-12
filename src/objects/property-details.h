@@ -98,7 +98,7 @@ enum class PropertyKind { kData = 0, kAccessor = 1 };
 // Must fit in the BitField PropertyDetails::LocationField.
 // kField =>
 //   属性内联在对象本体（即in-object field）中，或存放在properties
-//   backing store 中 kDescriptor =>
+//   backing store 中
 // kDescriptor =>
 //   属性信息直接存放在descriptor里，例如访问器属性
 enum class PropertyLocation { kField = 0, kDescriptor = 1 };
