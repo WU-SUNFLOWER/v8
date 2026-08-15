@@ -3463,6 +3463,7 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
 
   // Ensure that in-object space of slow-mode object does not contain random
   // garbage.
+  // 现在JavaScript对象中的所有属性都搬迁进了属性字典中，剩余的对象本体空间需要清零
   int inobject_properties = new_map->GetInObjectProperties();
   if (inobject_properties) {
     for (int i = 0; i < inobject_properties; i++) {
@@ -3489,6 +3490,8 @@ void JSObject::MigrateToMap(Isolate* isolate, Handle<JSObject> object,
   Handle<Map> old_map(object->map(isolate), isolate);
   NotifyMapChange(old_map, new_map, isolate);
 
+  // 情况1: slow to slow
+  // 情况2: slow to fast（会触发断言失败）
   if (old_map->is_dictionary_map()) {
     // For slow-to-fast migrations JSObject::MigrateSlowToFast()
     // must be used instead.
@@ -3496,7 +3499,12 @@ void JSObject::MigrateToMap(Isolate* isolate, Handle<JSObject> object,
 
     // Slow-to-slow migration is trivial.
     object->set_map(*new_map, kReleaseStore);
-  } else if (!new_map->is_dictionary_map()) {
+
+    return;
+  }
+
+  // 情况3: fast to fast
+  if (!new_map->is_dictionary_map()) {
     MigrateFastToFast(isolate, object, new_map);
     if (old_map->is_prototype_map()) {
       DCHECK(!old_map->is_stable());
@@ -3514,9 +3522,11 @@ void JSObject::MigrateToMap(Isolate* isolate, Handle<JSObject> object,
       DCHECK(IsUndefined(new_map->GetBackPointer(isolate), isolate));
       DCHECK(object->map(isolate) != *old_map);
     }
-  } else {
-    MigrateFastToSlow(isolate, object, new_map, expected_additional_properties);
+    return;
   }
+
+  // 情况4: fast to slow
+  MigrateFastToSlow(isolate, object, new_map, expected_additional_properties);
 
   // Careful: Don't allocate here!
   // For some callers of this method, |object| might be in an inconsistent
