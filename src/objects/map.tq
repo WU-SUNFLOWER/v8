@@ -33,6 +33,7 @@ bitfield struct MapBitFields3 extends uint32 {
   enum_length: int32: 10 bit;
   // descriptor array 中**生效的**属性描述符数量
   number_of_own_descriptors: int32: 10 bit;
+  // 标记当前Map代表的对象是原型对象
   is_prototype_map: bool: 1 bit;
   // 标记当前Map代表的对象采用dictionary（即慢速方式）存储属性
   is_dictionary_map: bool: 1 bit;
