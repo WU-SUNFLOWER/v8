@@ -302,6 +302,8 @@ TNode<JSObject> ConstructorBuiltinsAssembler::FastNewObject(
   // Load the initial map and verify that it's in fact a map.
   TNode<Object> initial_map_or_proto =
       LoadJSFunctionPrototypeOrInitialMap(new_target_func);
+  // 如果目标构造函数还没有可用的initial_map，那么就退化到慢速路径，
+  // 先走 C++ 层的 JSFunction::EnsureHasInitialMap()。
   GotoIf(TaggedIsSmi(initial_map_or_proto), call_runtime);
   GotoIf(DoesntHaveInstanceType(CAST(initial_map_or_proto), MAP_TYPE),
          call_runtime);

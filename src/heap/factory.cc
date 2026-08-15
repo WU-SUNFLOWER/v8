@@ -2457,6 +2457,10 @@ Handle<JSObject> Factory::NewFunctionPrototype(Handle<JSFunction> function) {
   // Make sure to use globals from the function's context, since the function
   // can be from a different context.
   Handle<NativeContext> native_context(function->native_context(), isolate());
+
+  // （1）为要创建的原型对象选取一个合适的 map：
+  // - 对于生成器和异步函数，使用特定的原型 map；
+  // - 对于其他函数，使用对象函数的initial map。
   Handle<Map> new_map;
   if (V8_UNLIKELY(IsAsyncGeneratorFunction(function->shared()->kind()))) {
     new_map = handle(native_context->async_generator_object_prototype_map(),
@@ -2476,8 +2480,11 @@ Handle<JSObject> Factory::NewFunctionPrototype(Handle<JSFunction> function) {
   }
 
   DCHECK(!new_map->is_prototype_map());
+  // （2）依据选取的 map 创建一个新的 JSObject 作为function的原型对象。
   Handle<JSObject> prototype = NewJSObjectFromMap(new_map);
 
+  // （3）对于非生成器、非异步、非模块的一般函数，向原型对象添加一个不可枚举
+  //      的 "constructor" 属性，指向该函数本身。
   if (!IsResumableFunction(function->shared()->kind())) {
     JSObject::AddProperty(isolate(), prototype, constructor_string(), function,
                           DONT_ENUM);

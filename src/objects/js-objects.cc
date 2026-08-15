@@ -2407,6 +2407,11 @@ MaybeHandle<JSObject> JSObject::New(Handle<JSFunction> constructor,
          !InstanceTypeChecker::IsJSFunction(
              constructor->initial_map()->instance_type()));
 
+  // 创建一个新的JavaScript对象，整体上可概括为两步：
+  // （1）从构造函数中取出initial_map，这个map定义了新对象的结构和属性布局。
+  //        - 如果构造函数还没有有效的initial_map，则在
+  //          JSFunction::GetDerivedMap() 当中会先创建。
+  // （2）使用initial_map和指定的初始容量创建一个新的JSObject实例。
   Handle<Map> initial_map;
   ASSIGN_RETURN_ON_EXCEPTION(
       isolate, initial_map,

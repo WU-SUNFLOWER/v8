@@ -826,11 +826,14 @@ void JSFunction::EnsureHasInitialMap(Handle<JSFunction> function) {
   CalculateInstanceSizeHelper(instance_type, false, 0, expected_nof_properties,
                               &instance_size, &inobject_properties);
 
+  // 为function分配一个initial map对象
   Handle<Map> map = isolate->factory()->NewMap(instance_type, instance_size,
                                                TERMINAL_FAST_ELEMENTS_KIND,
                                                inobject_properties);
 
   // Fetch or allocate prototype.
+  // 如果function之前已经有有效的原型对象，那么直接将它挂到initial map对象上去；
+  // 否则就为function分配一个原型对象，再挂到initial map对象上去。
   Handle<HeapObject> prototype;
   if (function->has_instance_prototype()) {
     prototype = handle(function->instance_prototype(), isolate);
@@ -842,6 +845,7 @@ void JSFunction::EnsureHasInitialMap(Handle<JSFunction> function) {
   DCHECK(map->has_fast_object_elements());
 
   // Finally link initial map and constructor function.
+  // 将initial map对象安装到function的prototype_or_initial_map字段上去
   DCHECK(IsJSReceiver(*prototype));
   JSFunction::SetInitialMap(isolate, function, map, prototype);
   map->StartInobjectSlackTracking();
@@ -1044,10 +1048,16 @@ bool FastInitializeDerivedMap(Isolate* isolate, Handle<JSFunction> new_target,
 MaybeHandle<Map> JSFunction::GetDerivedMap(Isolate* isolate,
                                            Handle<JSFunction> constructor,
                                            Handle<JSReceiver> new_target) {
+  // 先检查构造函数是否有可用的initial map，
+  // 如果没有则创建一个新的initial map，并安装到构造函数上去。
   EnsureHasInitialMap(constructor);
 
+  // 在ES6+之前，正常情况下，new_target == constructor。
+  // 这里直接返回constructor的initial map即可。
   Handle<Map> constructor_initial_map(constructor->initial_map(), isolate);
   if (*new_target == *constructor) return constructor_initial_map;
+
+  // 以下逻辑是为了适配ES6+扩展后的对象系统机制，这里暂时先略过不分析！
 
   Handle<Map> result_map;
   // Fast case, new.target is a subclass of constructor. The map is cacheable
