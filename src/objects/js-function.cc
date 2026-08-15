@@ -840,6 +840,8 @@ void JSFunction::EnsureHasInitialMap(Handle<JSFunction> function) {
     map->set_prototype(*prototype);
   } else {
     prototype = isolate->factory()->NewFunctionPrototype(function);
+    // 不同于简单的map->set_prototype(...)，Map::SetPrototype会进一步调用
+    // JSObject::OptimizeAsPrototype(...)，对新创建的原型对象进行后处理。
     Map::SetPrototype(isolate, map, prototype);
   }
   DCHECK(map->has_fast_object_elements());
