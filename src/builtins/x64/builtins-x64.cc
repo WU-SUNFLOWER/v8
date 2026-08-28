@@ -1460,7 +1460,11 @@ void NewImplicitReceiver(MacroAssembler* masm) {
   __ Push(rax);  // Number of arguments
   __ Push(rdx);  // NewTarget
   __ Push(rdi);  // Target
+
+  // FastNewObject的实现代码，见
+  // TF_BUILTIN(FastNewObject, ConstructorBuiltinsAssembler)
   __ Call(BUILTIN_CODE(masm->isolate(), FastNewObject), RelocInfo::CODE_TARGET);
+
   // Save result.
   __ movq(implicit_receiver, rax);
   // Restore live registers.
@@ -1538,6 +1542,7 @@ void Builtins::Generate_InterpreterPushArgsThenFastConstructFunction(
       static_cast<uint32_t>(FunctionKind::kDefaultDerivedConstructor),
       static_cast<uint32_t>(FunctionKind::kDerivedConstructor),
       &not_create_implicit_receiver, Label::kNear);
+  // 先创建JavaScript构造函数要处理的新JS对象
   NewImplicitReceiver(masm);
   __ bind(&not_create_implicit_receiver);
 

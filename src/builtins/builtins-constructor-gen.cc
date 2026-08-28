@@ -319,10 +319,12 @@ TNode<JSObject> ConstructorBuiltinsAssembler::FastNewObject(
 
   Label instantiate_map(this), allocate_properties(this);
   GotoIf(IsDictionaryMap(initial_map), &allocate_properties);
+  // 如果Map中声明使用快速模式，新建一个fixed array
   {
     properties = EmptyFixedArrayConstant();
     Goto(&instantiate_map);
   }
+  // 如果Map中声明使用快速模式，新建一个dictionary
   BIND(&allocate_properties);
   {
     if (V8_ENABLE_SWISS_NAME_DICTIONARY_BOOL) {
