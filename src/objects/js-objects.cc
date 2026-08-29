@@ -3491,7 +3491,9 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
 void JSObject::MigrateToMap(Isolate* isolate, Handle<JSObject> object,
                             Handle<Map> new_map,
                             int expected_additional_properties) {
+  // object 使用的已经是 new_map 了，就什么也不做
   if (object->map(isolate) == *new_map) return;
+
   Handle<Map> old_map(object->map(isolate), isolate);
   NotifyMapChange(old_map, new_map, isolate);
 
@@ -4997,6 +4999,8 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
     // Replace the pointer to the exact constructor with the Object function
     // from the same context if undetectable from JS. This is to avoid keeping
     // memory alive unnecessarily.
+    // 将 JavaScript 中的 Object 作为 new_map 所代表类型在 JavaScript
+    // 世界中的构造函数。
     Tagged<Object> maybe_constructor = new_map->GetConstructorRaw();
     Tagged<Tuple2> tuple;
     if (IsTuple2(maybe_constructor)) {
@@ -5013,10 +5017,13 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
         if (!tuple.is_null()) {
           tuple->set_value1(object_function);
         } else {
+          // 把 Object 安装到 new_map 的 constructor_or_back_pointer 字段上去
           new_map->SetConstructor(object_function);
         }
       }
     }
+
+    // 确保 object 已经迁移到 new_map 上去了
     JSObject::MigrateToMap(isolate, object, new_map);
 
     if (V8_DICT_PROPERTY_CONST_TRACKING_BOOL && !object->HasFastProperties()) {
