@@ -686,8 +686,12 @@ void String::PrintUC16(StringStream* accumulator, int start, int end) {
       accumulator->Add("\\r");
     } else if (c == '\\') {
       accumulator->Add("\\\\");
-    } else if (!std::isprint(c)) {
-      accumulator->Add("\\x%02x", c);
+    } else if (c < 0x20 || c > 0x7e) {
+      if (c <= 0xff) {
+        accumulator->Add("\\x%02x", static_cast<unsigned int>(c));
+      } else {
+        accumulator->Add("\\u%04x", static_cast<unsigned int>(c));
+      }
     } else {
       accumulator->Put(static_cast<char>(c));
     }
