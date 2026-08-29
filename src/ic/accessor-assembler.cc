@@ -3787,7 +3787,6 @@ void AccessorAssembler::StoreIC(const StoreICParameters* p) {
   {
     auto runtime = p->IsDefineNamedOwn() ? Runtime::kDefineNamedOwnIC_Miss
                                          : Runtime::kStoreIC_Miss;
-    Print("##################AccessorAssembler::StoreIC##################");
     TailCallRuntime(runtime, p->context(), p->value(), p->slot(), p->vector(),
                     p->receiver(), p->name());
   }
