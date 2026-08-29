@@ -323,6 +323,9 @@ static Handle<Object> GetFunctionPrototype(Isolate* isolate,
     // which means writes to it will be considered a side effect.
     DisableTemporaryObjectTracking no_temp_tracking(isolate->debug());
     Handle<JSObject> proto = isolate->factory()->NewFunctionPrototype(function);
+    // 这里不是简单地把原型对象挂到 JSFunction 或者其已初始化的 initial map
+    // 上就完事了。 最终这条调用链路会触发 JSObject::OptimizeAsPrototype(...)
+    // ，将原型对象临时退化 为字典存储模式。
     JSFunction::SetPrototype(function, proto);
   }
   return Handle<Object>(function->prototype(), isolate);
