@@ -3342,7 +3342,6 @@ TNode<HeapObject> CodeStubAssembler::LoadJSFunctionPrototype(
       function, JSFunction::kPrototypeOrInitialMapOffset);
   // 如果JSFunction的prototype_or_initial_map字段尚未初始化（占位值为hole），
   // 直接回退到runtime慢速路径。
-  Print(proto_or_map);
   GotoIf(IsTheHole(proto_or_map), if_bailout);
 
   TVARIABLE(HeapObject, var_result, proto_or_map);
