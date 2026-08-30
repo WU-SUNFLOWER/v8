@@ -85,6 +85,7 @@ TNode<HeapObjectReference> AccessorAssembler::TryMonomorphicCase(
   // into ElementOffsetFromIndex() allows it to be folded into a single
   // [base, index, offset] indirect memory access on x64.
   TNode<IntPtrT> offset = ElementOffsetFromIndex(slot, HOLEY_ELEMENTS);
+  // 从[slot]槽位中取出monomorph缓存记录的预期map
   TNode<HeapObjectReference> feedback = CAST(Load<MaybeObject>(
       vector, IntPtrAdd(offset, IntPtrConstant(header_size))));
 
@@ -92,8 +93,11 @@ TNode<HeapObjectReference> AccessorAssembler::TryMonomorphicCase(
   // if we have a weak reference in feedback.
   CSA_DCHECK(this,
              IsMap(GetHeapObjectAssumeWeak(weak_lookup_start_object_map)));
+  // 如果当前被查找对象的map不是缓存中记录的map，则缓存未命中（或者缓存已升级为polymorphic）
   GotoIfNot(TaggedEqual(feedback, weak_lookup_start_object_map), if_miss);
 
+  // 否则说明缓存成功命中，从[slot+1]槽位取出ic handler，
+  // 并跳进if_handler链路执行。
   TNode<MaybeObject> handler = UncheckedCast<MaybeObject>(
       Load(MachineType::AnyTagged(), vector,
            IntPtrAdd(offset, IntPtrConstant(header_size + kTaggedSize))));
@@ -3050,14 +3054,20 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
     {
       TNode<HeapObject> strong_feedback =
           GetHeapObjectIfStrong(feedback, &miss);
+      // 如果feedback对象不是一个FixedArray，说明当前缓存并没有处于Polymorphic状态。
+      // 此时退回到stub_call路径。
       GotoIfNot(IsWeakFixedArrayMap(LoadMap(strong_feedback)), &stub_call);
+      // 否则遍历这个FixedArray，尝试查找目标缓存handler。
       HandlePolymorphicCase(weak_lookup_start_object_map, CAST(strong_feedback),
                             &if_handler, &var_handler, &miss);
     }
   }
 
-  // 缓存已进入Megamorphic状态，走这里
-  // 在AccessorAssembler::LoadIC_Noninlined当中，可以进一步找到查询StubCache缓存的宏汇编
+  // FeedbackVector刚刚建立，还没有缓存记录；或者缓存已进入Megamorphic状态，就走这里。
+  // LoadIC_Noinlined的实现代码，见AccessorAssembler::GenerateLoadIC_Noninlined。
+  //
+  // 在LoadIC_Noninlined当中，会首先尝试查询全局StubCache缓存；
+  // 如果还是没找到，就回退到Runtime::kLoadIC_Miss慢速路径。
   BIND(&stub_call);
   {
     Comment("LoadIC_BytecodeHandler_noninlined");
@@ -4289,6 +4299,7 @@ void AccessorAssembler::GenerateLoadIC_Noninlined() {
   }
 
   BIND(&miss);
+  // 兜底：回退走 C++ Runtime 慢速路径
   direct_exit.ReturnCallRuntime(Runtime::kLoadIC_Miss, context, receiver, name,
                                 slot, vector);
 }
