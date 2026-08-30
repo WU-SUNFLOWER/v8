@@ -1092,8 +1092,16 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
         FieldIndex field = lookup->GetFieldIndex();
         smi_handler = LoadHandler::LoadField(isolate(), field);
         // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadFieldDH);
-        if (holder_is_lookup_start_object)
+
+        // 如果 holder 和 lookup_start_object
+        // 一致，说明目标属性就在被查找对象自己当中。 这时直接返回一个普通的
+        // LoadField Handler。
+        // 否则说明目标属性在原型链上，继续往下走，构造并返回一个
+        // LoadFromPrototype Handler。
+        if (holder_is_lookup_start_object) {
           return MaybeObjectHandle(smi_handler);
+        }
+
         // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadFieldFromPrototypeDH);
       }
       if (lookup->constness() == PropertyConstness::kConst &&
