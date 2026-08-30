@@ -2148,6 +2148,14 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
     return enable_ro_allocation_for_snapshot_;
   }
 
+  bool debugger_breakpoint_enabled() const {
+    return debugger_breakpoint_enabled_;
+  }
+
+  void set_debugger_breakpoint_enabled(bool value) {
+    debugger_breakpoint_enabled_ = value;
+  }
+
  private:
   explicit Isolate(std::unique_ptr<IsolateAllocator> isolate_allocator);
   ~Isolate();
@@ -2625,6 +2633,8 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
 #if USE_SIMULATOR
   SimulatorData* simulator_data_ = nullptr;
 #endif
+
+  bool debugger_breakpoint_enabled_ = true;
 
   friend class heap::HeapTester;
   friend class GlobalSafepoint;

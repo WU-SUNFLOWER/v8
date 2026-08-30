@@ -2248,5 +2248,12 @@ RUNTIME_FUNCTION(Runtime_DebugSleep) {
   return ReadOnlyRoots(isolate).undefined_value();
 }
 
+RUNTIME_FUNCTION(Runtime_SetDebuggerBreakpointEnabled) {
+  DCHECK(IsBoolean(args[0]));
+  bool value = IsTrue(args[0], isolate);
+  isolate->set_debugger_breakpoint_enabled(value);
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
 }  // namespace internal
 }  // namespace v8
