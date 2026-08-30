@@ -538,6 +538,7 @@ IGNITION_HANDLER(GetNamedProperty, InterpreterAssembler) {
   AccessorAssembler::LazyLoadICParameters params(lazy_context, recv, lazy_name,
                                                  lazy_slot, feedback_vector);
   AccessorAssembler accessor_asm(state());
+  // 进入 inline cache 系统中查找目标属性
   accessor_asm.LoadIC_BytecodeHandler(&params, &exit_point);
 
   BIND(&done);
