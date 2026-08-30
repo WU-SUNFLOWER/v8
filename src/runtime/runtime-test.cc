@@ -1273,6 +1273,10 @@ static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os,
 RUNTIME_FUNCTION(Runtime_DebugPrint) {
   SealHandleScope shs(isolate);
 
+  if (!isolate->debug_print_enabled()) {
+    return args[0];
+  }
+
   // This is exposed to tests / fuzzers; handle variable arguments gracefully.
   std::unique_ptr<std::ostream> output_stream(new StdoutStream());
   if (args.length() >= 2) {
@@ -1510,6 +1514,10 @@ RUNTIME_FUNCTION(Runtime_DebugTrackRetainingPath) {
 // very slowly for very deeply nested ConsStrings.  For debugging use only.
 RUNTIME_FUNCTION(Runtime_GlobalPrint) {
   SealHandleScope shs(isolate);
+
+  if (!isolate->debug_print_enabled()) {
+    return args[0];
+  }
 
   // This is exposed to tests / fuzzers; handle variable arguments gracefully.
   FILE* output_stream = stdout;
@@ -2252,6 +2260,13 @@ RUNTIME_FUNCTION(Runtime_SetDebuggerBreakpointEnabled) {
   DCHECK(IsBoolean(args[0]));
   bool value = IsTrue(args[0], isolate);
   isolate->set_debugger_breakpoint_enabled(value);
+  return ReadOnlyRoots(isolate).undefined_value();
+}
+
+RUNTIME_FUNCTION(Runtime_SetDebugPrintEnabled) {
+  DCHECK(IsBoolean(args[0]));
+  bool value = IsTrue(args[0], isolate);
+  isolate->set_debug_print_enabled(value);
   return ReadOnlyRoots(isolate).undefined_value();
 }
 

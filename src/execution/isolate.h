@@ -2156,6 +2156,10 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
     debugger_breakpoint_enabled_ = value;
   }
 
+  bool debug_print_enabled() const { return debug_print_enabled_; }
+
+  void set_debug_print_enabled(bool value) { debug_print_enabled_ = value; }
+
  private:
   explicit Isolate(std::unique_ptr<IsolateAllocator> isolate_allocator);
   ~Isolate();
@@ -2635,6 +2639,7 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
 #endif
 
   bool debugger_breakpoint_enabled_ = true;
+  bool debug_print_enabled_ = true;
 
   friend class heap::HeapTester;
   friend class GlobalSafepoint;

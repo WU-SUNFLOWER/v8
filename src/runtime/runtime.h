@@ -606,6 +606,7 @@ namespace internal {
   F(SerializeDeserializeNow, 0, 1)            \
   F(SetAllocationTimeout, -1 /* 2 || 3 */, 1) \
   F(SetDebuggerBreakpointEnabled, -1, 1)      \
+  F(SetDebugPrintEnabled, -1, 1)              \
   F(SetForceSlowPath, 1, 1)                   \
   F(SetIteratorProtector, 0, 1)               \
   F(SharedGC, 0, 1)                           \
