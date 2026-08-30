@@ -1231,7 +1231,8 @@ RUNTIME_FUNCTION(Runtime_TakeHeapSnapshot) {
   return ReadOnlyRoots(isolate).undefined_value();
 }
 
-static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os) {
+static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os,
+                           bool need_to_print_map) {
   DisallowGarbageCollection no_gc;
   if (maybe_object->IsCleared()) {
     os << "[weak cleared]";
@@ -1245,7 +1246,9 @@ static void DebugPrintImpl(MaybeObject maybe_object, std::ostream& os) {
     Print(object, os);
     if (IsHeapObject(object)) {
       // 打印堆上对象指向的 Map 对象
-      Print(HeapObject::cast(object)->map(), os);
+      if (need_to_print_map) {
+        Print(HeapObject::cast(object)->map(), os);
+      }
       // 如果该堆上对象是一个 JSObject，尝试打印它的 PropertyArray
       if (IsJSObject(object)) {
         Tagged<JSObject> js_object = JSObject::cast(object);
@@ -1282,8 +1285,13 @@ RUNTIME_FUNCTION(Runtime_DebugPrint) {
     }
   }
 
+  bool need_to_print_map = true;
+  if (args.length() >= 3 && IsBoolean(args[2])) {
+    need_to_print_map = IsTrue(args[2], isolate);
+  }
+
   MaybeObject maybe_object(*args.address_of_arg_at(0));
-  DebugPrintImpl(maybe_object, *output_stream.get());
+  DebugPrintImpl(maybe_object, *output_stream.get(), need_to_print_map);
   return args[0];
 }
 
@@ -1379,7 +1387,7 @@ RUNTIME_FUNCTION(Runtime_DebugPrintPtr) {
     size_t pointer;
     if (Object::ToIntegerIndex(object, &pointer)) {
       MaybeObject from_pointer(static_cast<Address>(pointer));
-      DebugPrintImpl(from_pointer, os);
+      DebugPrintImpl(from_pointer, os, true);
     }
   }
   // We don't allow the converted pointer to leak out to JavaScript.
