@@ -2740,8 +2740,12 @@ void AccessorAssembler::GenericPropertyLoad(
 
     Label if_descriptor_found(this), try_stub_cache(this);
     TVARIABLE(IntPtrT, var_name_index);
+    // 根据use_stub_cache参数决定：如果没有在对象本体中找到属性，
+    // 则先走 stub cache 查找，还是直接开始查找原型链。
     Label* notfound = use_stub_cache == kUseStubCache ? &try_stub_cache
                                                       : &lookup_prototype_chain;
+    // 在 lookup start object 的 descriptor 数组中
+    // 查找目标属性，找到则说明属性在对象本体当中。
     DescriptorLookup(name, descriptors, bitfield3, &if_descriptor_found,
                      &var_name_index, notfound);
 
@@ -2811,6 +2815,10 @@ void AccessorAssembler::GenericPropertyLoad(
 
   BIND(&if_found_on_lookup_start_object);
   {
+    // 如果在 lookup start object 中找到目标属性，
+    // 再进一步检查属性值是否是 AccessorPair 或者 AccessorInfo。
+    // 如果是，在 CallGetterIfAccessor
+    // 当中还需要首先执行调用；否则则什么也不会做。
     TNode<Object> value = CallGetterIfAccessor(
         var_value.value(), lookup_start_object, var_details.value(),
         p->context(), p->receiver(), p->name(), slow);
