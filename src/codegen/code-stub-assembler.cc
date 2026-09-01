@@ -10435,6 +10435,7 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
     Label rebox_double(this, &var_double_value);
     Branch(UintPtrLessThan(field_index, instance_size_in_words), &if_inobject,
            &if_backing_store);
+    // 属性内联在对象当中
     BIND(&if_inobject);
     {
       Comment("if_inobject");
@@ -10457,6 +10458,7 @@ void CodeStubAssembler::LoadPropertyFromFastObject(
         Goto(&rebox_double);
       }
     }
+    // 属性在 property array 当中
     BIND(&if_backing_store);
     {
       Comment("if_backing_store");
@@ -10552,6 +10554,8 @@ TNode<Object> CodeStubAssembler::CallGetterIfAccessor(
   Label done(this), if_accessor_info(this, Label::kDeferred);
 
   TNode<Uint32T> kind = DecodeWord32<PropertyDetails::KindField>(details);
+  // 如果当前找到的只是一个普通的 kData 属性，
+  // 那么不需要后续检查，直接把它透传回去即可。
   GotoIf(
       Word32Equal(kind, Int32Constant(static_cast<int>(PropertyKind::kData))),
       &done);
