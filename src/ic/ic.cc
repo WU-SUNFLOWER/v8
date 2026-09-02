@@ -828,6 +828,7 @@ void LoadIC::UpdateCaches(LookupIterator* lookup) {
   // Can't use {lookup->name()} because the LookupIterator might be in
   // "elements" mode for keys that are strings representing integers above
   // JSArray::kMaxIndex.
+  // 把handler安装到feedback vector上去
   SetCache(lookup->GetName(), handler);
   TraceIC("LoadIC", lookup->GetName());
 }
@@ -1128,10 +1129,13 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
 
           smi_handler = LoadHandler::LoadConstantFromPrototype(isolate());
           // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadConstantFromPrototypeDH);
+
+          // 如果是被标记为const的原型对象中的属性，那么直接缓存属性值
           return MaybeObjectHandle(LoadHandler::LoadFromPrototype(
               isolate(), map, holder, *smi_handler, weak_value));
         }
       }
+      // 如果原型对象中的属性没有被标记为const，那么缓存原型对象本身（即这里的holder）
       return MaybeObjectHandle(
           LoadHandler::LoadFromPrototype(isolate(), map, holder, *smi_handler));
     }

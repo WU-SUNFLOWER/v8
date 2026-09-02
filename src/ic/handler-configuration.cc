@@ -117,6 +117,7 @@ Handle<Object> LoadHandler::LoadFromPrototype(
     Handle<JSReceiver> holder, Tagged<Smi> smi_handler,
     MaybeObjectHandle maybe_data1, MaybeObjectHandle maybe_data2) {
   MaybeObjectHandle data1;
+  // 如果不缓存目标属性值，那么就把持有目标属性值的holder存下来
   if (maybe_data1.is_null()) {
     data1 = MaybeObjectHandle::Weak(holder);
   } else {

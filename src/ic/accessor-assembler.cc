@@ -3056,6 +3056,7 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
         &var_handler, &try_polymorphic);
 
     BIND(&if_handler);
+    // 如果的确存在Monomorphic缓存，那么尝试依据缓存的handler读出目标属性值
     HandleLoadICHandlerCase(p, var_handler.value(), &miss, exit_point);
 
     BIND(&try_polymorphic);
@@ -3242,9 +3243,14 @@ void AccessorAssembler::LoadIC_Noninlined(const LoadICParameters* p,
 
   {
     Label try_megamorphic(this), try_megadom(this);
+    // 如果缓存的feedback是megamorphic symbol，说明缓存已降级到超态
+    // （见FeedbackVector::MegamorphicSentinel()）。
+    // 那么先尝试查stub cache，仍未命中则再走miss慢速路径。
     GotoIf(TaggedEqual(feedback, MegamorphicSymbolConstant()),
            &try_megamorphic);
+    // 如果缓存的feedback是megadom symbol，尝试走v8针对浏览器DOM对象的优化路径。
     GotoIf(TaggedEqual(feedback, MegaDOMSymbolConstant()), &try_megadom);
+    // 否则回退到慢速路径
     Goto(miss);
 
     BIND(&try_megamorphic);
@@ -4297,9 +4303,11 @@ void AccessorAssembler::GenerateLoadIC_Noninlined() {
 
   LoadICParameters p(context, receiver, name, slot, vector);
   TNode<Map> lookup_start_object_map = LoadReceiverMap(p.lookup_start_object());
+  // 先看缓存是否处于megamorphic或megadom状态，如果是则尝试继续在快速路径中查找
   LoadIC_Noninlined(&p, lookup_start_object_map, feedback, &var_handler,
                     &if_handler, &miss, &direct_exit);
 
+  // 查找命中
   BIND(&if_handler);
   {
     LazyLoadICParameters lazy_p(&p);
@@ -4307,7 +4315,9 @@ void AccessorAssembler::GenerateLoadIC_Noninlined() {
   }
 
   BIND(&miss);
-  // 兜底：回退走 C++ Runtime 慢速路径
+  // 兜底：
+  // 缓存未处于megamorphic或megadom状态（即可能还未初始化），
+  // 或快速路径查找未命中，回退走 C++ Runtime 慢速路径。
   direct_exit.ReturnCallRuntime(Runtime::kLoadIC_Miss, context, receiver, name,
                                 slot, vector);
 }
