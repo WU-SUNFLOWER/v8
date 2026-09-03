@@ -96,13 +96,15 @@ TNode<HeapObjectReference> AccessorAssembler::TryMonomorphicCase(
   // 如果当前被查找对象的map不是缓存中记录的map，则缓存未命中（或者缓存已升级为polymorphic）
   GotoIfNot(TaggedEqual(feedback, weak_lookup_start_object_map), if_miss);
 
-  // 否则说明缓存成功命中，从[slot+1]槽位取出ic handler，
-  // 并跳进if_handler链路执行。
+  // 否则说明缓存成功命中，从[slot+1]槽位取出ic handler。
+  // ic handler可能是一个smi，也可能是一个DataHandler，比如
+  // LoadHandler或者StoreHandler。
   TNode<MaybeObject> handler = UncheckedCast<MaybeObject>(
       Load(MachineType::AnyTagged(), vector,
            IntPtrAdd(offset, IntPtrConstant(header_size + kTaggedSize))));
 
   *var_handler = handler;
+  // 然后跳进if_handler链路执行。
   Goto(if_handler);
   return feedback;
 }
@@ -223,6 +225,7 @@ void AccessorAssembler::HandleLoadICHandlerCase(
     ElementSupport support_elements, LoadAccessMode access_mode) {
   Comment("have_handler");
 
+  // 取查找开始的对象作为默认的属性holder
   TVARIABLE(Object, var_holder, p->lookup_start_object());
   TVARIABLE(MaybeObject, var_smi_handler, handler);
 
@@ -231,6 +234,8 @@ void AccessorAssembler::HandleLoadICHandlerCase(
       call_code_handler(this, Label::kDeferred),
       call_getter(this, Label::kDeferred);
 
+  // 如果ic handler本身就是一个Smi，那么直接进if_smi_handler流程；
+  // 否则它可能是一个LoadHandler，进try_proto_handler流程。
   Branch(TaggedIsSmi(handler), &if_smi_handler, &try_proto_handler);
 
   BIND(&try_proto_handler);
@@ -725,6 +730,9 @@ void AccessorAssembler::HandleLoadICSmiHandlerLoadNamedCase(
   BIND(&constant);
   {
     Comment("constant_load");
+    // 如果load handler是kConstantFromPrototype类型的，那么里面读出来的
+    // holder就是constant value，直接把它透传回去即是最终查找结果，基于IC
+    // 缓存的查找流程至此已全部结束。
     exit_point->Return(holder);
   }
 
@@ -1096,6 +1104,7 @@ void AccessorAssembler::HandleLoadICProtoHandler(
     TVariable<Object>* var_holder, TVariable<MaybeObject>* var_smi_handler,
     Label* if_smi_handler, Label* miss, ExitPoint* exit_point, ICMode ic_mode,
     LoadAccessMode access_mode) {
+  // 读出load handler的smi_handler字段
   TNode<Smi> smi_handler = CAST(HandleProtoHandler<LoadHandler>(
       p, handler,
       // Code sub-handlers are not expected in LoadICs, so no |on_code_handler|.
@@ -1117,12 +1126,17 @@ void AccessorAssembler::HandleLoadICProtoHandler(
       },
       miss, ic_mode));
 
+  // 从load handler的data1字段中读出缓存的holder，
+  // 即真正持有目标属性的那个原型对象（如果是kField类型的load handler）；
+  // 或者constant value（如果是kConstantFromPrototype类型的load handler）。
   TNode<MaybeObject> maybe_holder_or_constant =
       LoadHandlerDataField(handler, 1);
 
   Label load_from_cached_holder(this), is_smi(this), done(this);
 
   GotoIf(TaggedIsSmi(maybe_holder_or_constant), &is_smi);
+  // 如果load handler中缓存的maybe_holder_or_constant有效（不是null），
+  // 进load_from_cached_holder流程把它透传回去。
   Branch(TaggedEqual(maybe_holder_or_constant, NullConstant()), &done,
          &load_from_cached_holder);
 
@@ -1155,6 +1169,8 @@ void AccessorAssembler::HandleLoadICProtoHandler(
 
   BIND(&done);
   {
+    // 最后把从load handler里读出来的smi handler也一起透传回去，
+    // 以便下一步走if_smi_handler流程。
     *var_smi_handler = smi_handler;
     Goto(if_smi_handler);
   }
