@@ -1080,8 +1080,9 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
         }
         smi_handler = LoadHandler::LoadNormal(isolate());
         // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadNormalDH);
-        if (holder_is_lookup_start_object)
+        if (holder_is_lookup_start_object) {
           return MaybeObjectHandle(smi_handler);
+        }
         // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadNormalFromPrototypeDH);
       } else if (lookup->IsElement(*holder)) {
         // TRACE_HANDLER_STATS(isolate(), LoadIC_SlowStub);
@@ -1130,12 +1131,14 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
           smi_handler = LoadHandler::LoadConstantFromPrototype(isolate());
           // TRACE_HANDLER_STATS(isolate(), LoadIC_LoadConstantFromPrototypeDH);
 
-          // 如果是被标记为const的原型对象中的属性，那么直接缓存属性值
+          // 如果是被标记为const的原型对象中的属性，那么直接缓存属性值；
+          // 并且在smi handler中，缓存类型被标记为Kind::kConstantFromPrototype。
           return MaybeObjectHandle(LoadHandler::LoadFromPrototype(
               isolate(), map, holder, *smi_handler, weak_value));
         }
       }
-      // 如果原型对象中的属性没有被标记为const，那么缓存原型对象本身（即这里的holder）
+      // 如果原型对象中的属性没有被标记为const，那么缓存原型对象本身（即这里的holder）；
+      // smi handler中的缓存类型为默认的Kind::kField。
       return MaybeObjectHandle(
           LoadHandler::LoadFromPrototype(isolate(), map, holder, *smi_handler));
     }
