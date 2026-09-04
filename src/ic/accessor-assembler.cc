@@ -1012,6 +1012,7 @@ TNode<Object> AccessorAssembler::HandleProtoHandler(
   // Check prototype validity cell.
   //
   {
+    // 读DataHandler对象的validity_cell字段，进行检测
     TNode<Object> maybe_validity_cell =
         LoadObjectField(handler, ICHandler::kValidityCellOffset);
     CheckPrototypeValidityCell(maybe_validity_cell, miss);
@@ -1804,8 +1805,10 @@ void AccessorAssembler::CheckPrototypeValidityCell(
       &done);
   CSA_DCHECK(this, TaggedIsNotSmi(maybe_validity_cell));
 
+  // 从cell对象中读出value
   TNode<Object> cell_value =
       LoadObjectField(CAST(maybe_validity_cell), Cell::kValueOffset);
+  // 如果value值为kPrototypeChainValid，说明IC缓存未失效，继续走快速路径；否则直接回退到慢速路径。
   Branch(TaggedEqual(cell_value, SmiConstant(Map::kPrototypeChainValid)), &done,
          miss);
 
@@ -3116,9 +3119,10 @@ void AccessorAssembler::LoadIC_BytecodeHandler(const LazyLoadICParameters* p,
         SmiConstant(FeedbackSlotKind::kLoadProperty));
   }
 
-  // 缓存已进入Polymorphic状态，但经过查找发现未命中ic，
-  // 走这里进入 c++ runtime 处理。
-  // 接下去可能要更新缓存或者将缓存状态升级为Megamorphic？
+  // 以下情况需要C++ Runtime慢速路径处理：
+  // （1）缓存已进入Polymorphic状态，但经过查找发现未命中ic
+  //      - 需要更新缓存记录，或者将缓存状态升级为Megamorphic。
+  // （2）LoadHandler的validity_cell被标记为失效
   BIND(&miss);
   {
     Comment("LoadIC_BytecodeHandler_miss");
