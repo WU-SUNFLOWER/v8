@@ -1874,6 +1874,16 @@ MaybeHandle<Object> StoreIC::Store(Handle<Object> object, Handle<Name> name,
   // ES #sec-definefield
   // ES #sec-runtime-semantics-propertydefinitionevaluation
   // IsAnyDefineOwn() can be true when this method is reused by KeyedStoreIC.
+  //
+  // 这一次 JavaScript 赋值操作，应该按"直接定义自己的属性"语义处理，
+  // 还是按"普通赋值"语义处理？
+  // - 直接定义自己的属性：
+  //     直接在object这个JS对象身上定义属性，不应触发原型的 setter，
+  //     可以理解成通过 Object.defineProperty 定义属性。
+  //     ES6+中的JS类字段初始化，就属于这种语义。
+  // - 普通赋值：
+  //     受原型链影响。例如原型上有 setter，就会调用 setter，
+  //     而不一定在object这个JS对象自己身上创建属性。
   if (IsAnyDefineOwn()) {
     if (name->IsPrivateName()) {
       // We should define private fields without triggering traps or checking
