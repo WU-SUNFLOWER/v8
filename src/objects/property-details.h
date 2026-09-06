@@ -595,6 +595,16 @@ inline bool IsGeneralizableTo(PropertyLocation a, PropertyLocation b) {
 
 // PropertyConstness::kMutable constness is more general than
 // VariableMode::kConst, VariableMode::kConst generalizes only to itself.
+//
+// 【结果矩阵】
+// a            b         结果
+// kConst    ⪯  kConst    true
+// kConst    ⪯  kMutable  true
+// kMutable  ⪯  kConst    false
+// kMutable  ⪯  kMutable  true
+//
+// 【偏序关系】
+// kConst ⪯ kConst ⪯ kMutable ⪯ kMutable
 inline bool IsGeneralizableTo(PropertyConstness a, PropertyConstness b) {
   return b == PropertyConstness::kMutable || a == PropertyConstness::kConst;
 }
