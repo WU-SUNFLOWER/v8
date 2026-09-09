@@ -1136,6 +1136,8 @@ void MapUpdater::UpdateFieldType(Isolate* isolate, Handle<Map> map,
   if (details.location() != PropertyLocation::kField) return;
   DCHECK_EQ(PropertyKind::kData, details.kind());
 
+  // 如果要更新的map是给原型对象使用的，并且属性的constness发生了变化（只能是kConst→kMutable），
+  // 那么就先顺手将挂在map及其所有下游user map的validity cell全部标记为失效。
   if (new_constness != details.constness() && map->is_prototype_map()) {
     JSObject::InvalidatePrototypeChains(*map);
   }

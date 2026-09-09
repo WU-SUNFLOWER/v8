@@ -609,6 +609,8 @@ inline bool IsGeneralizableTo(PropertyConstness a, PropertyConstness b) {
   return b == PropertyConstness::kMutable || a == PropertyConstness::kConst;
 }
 
+// 依据偏序关系的大小，从a和b中选出最大者
+// GeneralizeConstness(a, b) = max{a, b}
 inline PropertyConstness GeneralizeConstness(PropertyConstness a,
                                              PropertyConstness b) {
   return a == PropertyConstness::kMutable ? PropertyConstness::kMutable : b;

@@ -391,7 +391,9 @@ void LookupIterator::PrepareForDataProperty(Handle<Object> value) {
     // Check that current value matches new value otherwise we should make
     // the property mutable.
     if (holder->HasFastProperties(isolate_)) {
-      if (!CanStayConst(*value)) new_constness = PropertyConstness::kMutable;
+      if (!CanStayConst(*value)) {
+        new_constness = PropertyConstness::kMutable;
+      }
     } else if (V8_DICT_PROPERTY_CONST_TRACKING_BOOL) {
       if (!DictCanStayConst(*value)) {
         property_details_ =

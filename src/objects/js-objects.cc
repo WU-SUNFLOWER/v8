@@ -5226,8 +5226,11 @@ void InvalidatePrototypeChainsInternal(Tagged<Map> map) {
         // Walk the prototype chain (backwards, towards leaf objects) if
         // necessary.
         if (next_map.is_null()) {
+          // 针对遇到的第一个有效的 Map 子节点，不递归，
+          // 而是依赖外层循环推进遍历（手工的尾递归消除）。
           next_map = Map::cast(heap_object);
         } else {
+          // 其他子节点，按正常的递归遍历进行处理
           InvalidatePrototypeChainsInternal(Map::cast(heap_object));
         }
       }
