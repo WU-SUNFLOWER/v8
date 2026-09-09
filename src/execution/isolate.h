@@ -2638,8 +2638,8 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
   SimulatorData* simulator_data_ = nullptr;
 #endif
 
-  bool debugger_breakpoint_enabled_ = true;
-  bool debug_print_enabled_ = true;
+  bool debugger_breakpoint_enabled_ = false;
+  bool debug_print_enabled_ = false;
 
   friend class heap::HeapTester;
   friend class GlobalSafepoint;
