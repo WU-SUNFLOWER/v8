@@ -1168,6 +1168,8 @@ void MapUpdater::UpdateFieldType(Isolate* isolate, Handle<Map> map,
     if (new_constness != details.constness() ||
         !new_representation.Equals(details.representation()) ||
         descriptors->GetFieldType(descriptor) != *new_wrapped_type.object()) {
+      // 更新map的DescriptorArray数组中的目标descriptor，
+      // 把新的constness、representation等信息落地进去。
       Descriptor d = Descriptor::DataField(
           name, descriptors->GetFieldIndex(descriptor), details.attributes(),
           new_constness, new_representation, new_wrapped_type);
