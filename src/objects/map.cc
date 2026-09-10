@@ -32,18 +32,24 @@
 namespace v8 {
 namespace internal {
 
+// 当前map所对应的js对象做原型查找时，应该从哪张map开始取prototype？
 Tagged<Map> Map::GetPrototypeChainRootMap(Isolate* isolate) const {
   DisallowGarbageCollection no_alloc;
+  // 如果当前map描述的是一个“可接收属性访问、原型链等对象语义”的普通js对象，
+  // 那么直接返回当前map本身。
   if (IsJSReceiverMap(*this)) {
     return *this;
   }
   int constructor_function_index = GetConstructorFunctionIndex();
+  // 如果当前map代表的js类型有有效的内建构造函数，
+  // 那么先找到这个内建函数，然后取出它的initial map作为返回结果。
   if (constructor_function_index != Map::kNoConstructorFunctionIndex) {
     Tagged<Context> native_context = isolate->context()->native_context();
     Tagged<JSFunction> constructor_function =
         JSFunction::cast(native_context->get(constructor_function_index));
     return constructor_function->initial_map();
   }
+  // 否则返回null对象的map作为兜底
   return ReadOnlyRoots(isolate).null_value()->map();
 }
 
@@ -2274,6 +2280,8 @@ void Map::SetShouldBeFastPrototypeMap(Handle<Map> map, bool value,
 }
 
 // static
+// 当前map对应一个js对象，获取该js对象的原型对象的validity cell；
+// 或者为该原型对象分配一个处于有效状态的合法validity cell
 Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
                                                           Isolate* isolate) {
   Handle<Object> maybe_prototype;
@@ -2286,6 +2294,8 @@ Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
     maybe_prototype =
         handle(map->GetPrototypeChainRootMap(isolate)->prototype(), isolate);
   }
+  // 如果获取到的对象不能被认为是一个有效的js原型对象，
+  // 那么直接返回Map::kPrototypeChainValid占位符。
   if (!IsJSObjectThatCanBeTrackedAsPrototype(*maybe_prototype)) {
     return handle(Smi::FromInt(Map::kPrototypeChainValid), isolate);
   }
@@ -2298,6 +2308,7 @@ Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
   Tagged<Object> maybe_cell =
       prototype->map()->prototype_validity_cell(kRelaxedLoad);
   // Return existing cell if it's still valid.
+  // 如果当前挂在原型对象的map上的validity cell没失效，就直接使用
   if (IsCell(maybe_cell)) {
     Tagged<Cell> cell = Cell::cast(maybe_cell);
     if (cell->value() == Smi::FromInt(Map::kPrototypeChainValid)) {
@@ -2305,6 +2316,10 @@ Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
     }
   }
   // Otherwise create a new cell.
+  // 如果原有validity cell已失效，不能直接复用，必须重新分配新的cell，
+  // 并挂到原型对象的map上去。
+  // 因为可能还有尚未被V8执行失效处理的旧IC缓存在持有原cell，如果直接
+  // 把原来的kPrototypeChainInvalid记录给覆盖掉，V8就没法发现相应的IC缓存已失效了。
   Handle<Cell> cell =
       isolate->factory()->NewCell(Smi::FromInt(Map::kPrototypeChainValid));
   prototype->map()->set_prototype_validity_cell(*cell, kRelaxedStore);

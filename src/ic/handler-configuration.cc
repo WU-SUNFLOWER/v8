@@ -117,7 +117,8 @@ Handle<Object> LoadHandler::LoadFromPrototype(
     Handle<JSReceiver> holder, Tagged<Smi> smi_handler,
     MaybeObjectHandle maybe_data1, MaybeObjectHandle maybe_data2) {
   MaybeObjectHandle data1;
-  // 如果不缓存目标属性值，那么就把持有目标属性值的holder存下来
+  // （1）如果要直接缓存目标属性值，那么就通过maybe_data1带进来。
+  // （2）如果不缓存目标属性值，就取持有目标属性值的holder作为data1。
   if (maybe_data1.is_null()) {
     data1 = MaybeObjectHandle::Weak(holder);
   } else {
@@ -129,11 +130,12 @@ Handle<Object> LoadHandler::LoadFromPrototype(
 
   Handle<Object> validity_cell = Map::GetOrCreatePrototypeChainValidityCell(
       lookup_start_object_map, isolate);
-
+  // 构造LoadHandler对象，并且把smi handler和validity cell打包进去
   Handle<LoadHandler> handler = isolate->factory()->NewLoadHandler(data_size);
 
   handler->set_smi_handler(smi_handler);
   handler->set_validity_cell(*validity_cell);
+  // 把data1和data2（如果有的话）安装进LoadHandler对象的槽位
   InitPrototypeChecks(isolate, handler, lookup_start_object_map, data1,
                       maybe_data2);
   return handler;

@@ -392,6 +392,7 @@ void LookupIterator::PrepareForDataProperty(Handle<Object> value) {
     // the property mutable.
     if (holder->HasFastProperties(isolate_)) {
       if (!CanStayConst(*value)) {
+        // 准备将目标属性的constness从kConst退化为kMutable
         new_constness = PropertyConstness::kMutable;
       }
     } else if (V8_DICT_PROPERTY_CONST_TRACKING_BOOL) {
