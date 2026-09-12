@@ -2302,6 +2302,9 @@ Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
   Handle<JSObject> prototype = Handle<JSObject>::cast(maybe_prototype);
   // Ensure the prototype is registered with its own prototypes so its cell
   // will be invalidated when necessary.
+  // 确保当前原型对象（的map）注册进上游原型对象（的map）的PrototypeInfo成员的prototype_users数组。
+  // 这样，当上游原型对象发生失效时，V8就可以在InvalidatePrototypeChainsInternal()函数中
+  // 扫描到当前原型对象（的map），并将其validity cell标记为失效。
   JSObject::LazyRegisterPrototypeUser(handle(prototype->map(), isolate),
                                       isolate);
 

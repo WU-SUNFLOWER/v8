@@ -5075,8 +5075,13 @@ void JSObject::LazyRegisterPrototypeUser(Handle<Map> user, Isolate* isolate) {
   Handle<Map> current_user = user;
   Handle<PrototypeInfo> current_user_info =
       Map::GetOrCreatePrototypeInfo(user, isolate);
+  // 将user视为receiver对象的map，从其原型对象出发向原型链上游遍历，直至遇到原型链终点null
   for (PrototypeIterator iter(isolate, user); !iter.IsAtEnd(); iter.Advance()) {
     // Walk up the prototype chain as far as links haven't been registered yet.
+    // 如果当前原型对象（的map）已经在上游原型对象（的map）中注册过了
+    // （体现在其自身PrototypeInfo的registry_slot字段取值已为有效非负整型下标），
+    // 那么说明它更上面的上游原型对象们先前也都依次注册过了，就不用继续往上迭代了。
+    // 这个提前退出条件的设计，与JSObject::MakePrototypesFast()中者有异曲同工之妙。
     if (current_user_info->registry_slot() != PrototypeInfo::UNREGISTERED) {
       break;
     }
@@ -5091,9 +5096,11 @@ void JSObject::LazyRegisterPrototypeUser(Handle<Map> user, Isolate* isolate) {
     // anyway. Additionally, registering users of shared objects is not
     // threadsafe.
     if (!IsJSObjectThatCanBeTrackedAsPrototype(*maybe_proto)) continue;
+    // 上游原型对象及其（map的）PrototypeInfo
     Handle<JSObject> proto = Handle<JSObject>::cast(maybe_proto);
     Handle<PrototypeInfo> proto_info =
         Map::GetOrCreatePrototypeInfo(proto, isolate);
+    // 上游原型对象的（map的）PrototypeUsers数组
     Handle<Object> maybe_registry(proto_info->prototype_users(), isolate);
     Handle<WeakArrayList> registry =
         IsSmi(*maybe_registry)
@@ -5101,9 +5108,12 @@ void JSObject::LazyRegisterPrototypeUser(Handle<Map> user, Isolate* isolate) {
                      isolate)
             : Handle<WeakArrayList>::cast(maybe_registry);
     int slot = 0;
+    // 将当前原型对象（的map）写进上游原型对象（的map）的PrototypeUsers数组
     Handle<WeakArrayList> new_array =
         PrototypeUsers::Add(isolate, registry, current_user, &slot);
+    // 在当前原型对象（的map）中记录其自身在上游原型对象（的map）的PrototypeUsers数组中的下标位置
     current_user_info->set_registry_slot(slot);
+    // 将更新后的上游原型对象（的map）的PrototypeUsers数组挂回其（map的）PrototypeInfo成员
     if (!maybe_registry.is_identical_to(new_array)) {
       proto_info->set_prototype_users(*new_array);
     }
@@ -5114,6 +5124,7 @@ void JSObject::LazyRegisterPrototypeUser(Handle<Map> user, Isolate* isolate) {
              reinterpret_cast<void*>(proto->map().ptr()));
     }
 
+    // 将本轮迭代中的上游原型对象（的map），作为下一轮迭代时要处理的原型对象（的map）
     current_user = handle(proto->map(), isolate);
     current_user_info = proto_info;
   }
