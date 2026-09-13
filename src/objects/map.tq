@@ -93,6 +93,12 @@ extern class Map extends HeapObject {
   instance_descriptors: DescriptorArray;
   dependent_code: DependentCode;
   prototype_validity_cell: Smi|Cell;
+  // - 对于用于描述JS原型对象（is_prototype_map == true）的 Map，
+  //   V8不维护普通对象那种可复用的property transition tree，而只维护PrototypeInfo信息。
+  // - 因此在Map的结构布局设计中，PrototypeInfo 和 TransitionArray 可以复用同一个字段。
+  // - 但这不意味着"JS原型对象不会发生 Map 迁移"。向原型对象添加新属性，V8仍然会创建新的Map，并执行migration。
+  //   只是"旧 Map → 新 Map"的迁移关系不会像处理一般对象时那样，被V8记录在旧 Map 上。
+  // 更多详细，参考`docs/why-dont-v8-maintain-transition-array-for-prototype-map.md`
   transitions_or_prototype_info: Map|Weak<Map>|TransitionArray|PrototypeInfo|
       Smi;
 }
