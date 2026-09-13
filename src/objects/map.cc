@@ -2257,12 +2257,14 @@ Handle<PrototypeInfo> Map::GetOrCreatePrototypeInfo(Handle<JSObject> prototype,
 // static
 Handle<PrototypeInfo> Map::GetOrCreatePrototypeInfo(Handle<Map> prototype_map,
                                                     Isolate* isolate) {
+  // 如果map中已经有有效的PrototypeInfo成员，则直接返回
   {
     Tagged<Object> maybe_proto_info = prototype_map->prototype_info();
     if (PrototypeInfo::IsPrototypeInfoFast(maybe_proto_info)) {
       return handle(PrototypeInfo::cast(maybe_proto_info), isolate);
     }
   }
+  // 否则立即在v8堆上懒分配一个
   Handle<PrototypeInfo> proto_info = isolate->factory()->NewPrototypeInfo();
   prototype_map->set_prototype_info(*proto_info, kReleaseStore);
   return proto_info;
