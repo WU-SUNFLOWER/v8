@@ -16520,7 +16520,7 @@ void CodeStubAssembler::PrintToStream(const char* prefix, TNode<Float64T> value,
 
 void CodeStubAssembler::PrintToStream(const char* prefix, TNode<BoolT> value,
                                       int stream) {
-  PrintToStream(prefix, SelectBooleanConstant(value), stream);
+  PrintToStream(prefix, ChangeUint32ToWord(value), stream);
 }
 
 IntegerLiteral CodeStubAssembler::ConstexprIntegerLiteralAdd(
