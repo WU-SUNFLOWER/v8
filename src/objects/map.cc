@@ -2280,8 +2280,9 @@ void Map::SetShouldBeFastPrototypeMap(Handle<Map> map, bool value,
 }
 
 // static
-// 当前map对应一个js对象，获取该js对象的原型对象的validity cell；
-// 或者为该原型对象分配一个处于有效状态的合法validity cell
+// （1）当前map描述一类js对象，获取这类js对象的原型对象的validity cell，返回之。
+// （2）如果该原型对象的validity cell不存在，或者已被标记为无效，那么先分配一个
+//      处于有效状态的新validity cell，然后返回它。
 Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
                                                           Isolate* isolate) {
   Handle<Object> maybe_prototype;
@@ -2291,6 +2292,7 @@ Handle<Object> Map::GetOrCreatePrototypeChainValidityCell(Handle<Map> map,
     // use its validity cell for guarding global object's prototype change.
     maybe_prototype = isolate->global_object();
   } else {
+    // 找到map所描述js对象的实际原型对象是谁
     maybe_prototype =
         handle(map->GetPrototypeChainRootMap(isolate)->prototype(), isolate);
   }

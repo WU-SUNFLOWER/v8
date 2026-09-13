@@ -2633,12 +2633,15 @@ Maybe<bool> Object::TransitionAndWriteDataProperty(
   it->UpdateProtector();
   // Migrate to the most up-to-date map that will be able to store |value|
   // under it->name() with |attributes|.
+  // 为目标receiver计算迁移后的新map，并存储为LookupIterator实例的transition_成员
   it->PrepareTransitionToDataProperty(receiver, value, attributes,
                                       store_origin);
   DCHECK_EQ(LookupIterator::TRANSITION, it->state());
+  // 将LookupIterator实例的transition_成员应用到目标receiver上去，执行实际的map迁移
   it->ApplyTransitionToDataProperty(receiver);
 
   // Write the property value.
+  // map迁移完成后，将属性值value写入目标receiver
   it->WriteDataValue(value, true);
 
 #if VERIFY_HEAP

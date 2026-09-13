@@ -3137,8 +3137,20 @@ void JSObject::UpdatePrototypeUserRegistration(Handle<Map> old_map,
 // static
 void JSObject::NotifyMapChange(Handle<Map> old_map, Handle<Map> new_map,
                                Isolate* isolate) {
+  // 如果迁移之前的old_map不用于描述js原型对象，
+  // 则添加新属性、引发map迁移之后，啥也不用做。
   if (!old_map->is_prototype_map()) return;
 
+  // 在原型对象中添加新属性，可能使得JavaScript世界中的原型属性访问表现发生变化。
+  // > - 例如有原型链关系 `dogInstance ==> Dog.prototype ==> Animal.prototype`。
+  // >   原先只存在 `Animal.prototype.birth()` 方法，因此 `dogInstance.birth()`
+  // >   操作的IC缓存内容也是`Animal.prototype`或者`Animal.prototype.birth`。
+  // > - 现在添加`Dog.prototype.birth()`新方法后，JS操作 `dogInstance.birth()`
+  // >   的实际调用目标就变为了该新方法。这就要求原先指向`Animal.prototype`的
+  // >   IC缓存先失效掉。
+  // > - 因此这里调用InvalidatePrototypeChains()，让old_map所描述的原型对象，
+  // >   及依赖其的下游原先对象的（map的）validity cell全部被标记为失效，这样
+  // >   就能引发相关的IC缓存被V8失效。
   InvalidatePrototypeChains(*old_map);
 
   // If the map was registered with its prototype before, ensure that it
@@ -3495,6 +3507,8 @@ void JSObject::MigrateToMap(Isolate* isolate, Handle<JSObject> object,
   if (object->map(isolate) == *new_map) return;
 
   Handle<Map> old_map(object->map(isolate), isolate);
+  // 通知发生map迁移操作。
+  // 这个函数调用会进一步引发相关原型对象map的validity cell被批量标记为失效！
   NotifyMapChange(old_map, new_map, isolate);
 
   // 情况1: slow to slow

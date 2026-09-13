@@ -1138,6 +1138,12 @@ void MapUpdater::UpdateFieldType(Isolate* isolate, Handle<Map> map,
 
   // 如果要更新的map是给原型对象使用的，并且属性的constness发生了变化（只能是kConst→kMutable），
   // 那么就先顺手将挂在map及其所有下游user map的validity cell全部标记为失效。
+  // 这是因为原先处于constness=kConst状态的原型对象属性，其对应LoadIC可能直接缓存了该属性值本身。
+  // 现在属性值发生了更新，自然需要通过失效validity
+  // cell的方式来让相关IC缓存全部失效掉。 否则就JS代码就会读到旧数据了。
+  //
+  // 在原型对象中添加新属性的场景，也会触发JSObject::InvalidatePrototypeChains()。
+  // 参考：JSObject::NotifyMapChange()
   if (new_constness != details.constness() && map->is_prototype_map()) {
     JSObject::InvalidatePrototypeChains(*map);
   }

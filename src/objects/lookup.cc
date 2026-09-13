@@ -670,11 +670,17 @@ void LookupIterator::ApplyTransitionToDataProperty(
       !transition->IsPrototypeValidityCellValid()) {
     // Only LookupIterator instances with DEFAULT (full prototype chain)
     // configuration can produce valid transition handler maps.
+    //
+    // V8中不作为原型对象使用的普通JS对象（的map）的prototype_validity_cell字段也可能有效。
+    // 它可以与其原型对象（的map）共享同一个validity cell。
+    // **这里由于时间关系先这么记一下，未来还需要再搞清楚何种场景下，**
+    // **V8会直接访问普通JS对象的（map的）prototype_validity_cell字段**
     Handle<Object> validity_cell =
         Map::GetOrCreatePrototypeChainValidityCell(transition, isolate());
     transition->set_prototype_validity_cell(*validity_cell, kRelaxedStore);
   }
 
+  // 对于非js proxy的普通receiver，执行实际的map迁移操作
   if (!IsJSProxy(*receiver, isolate_)) {
     JSObject::MigrateToMap(isolate_, Handle<JSObject>::cast(receiver),
                            transition);
