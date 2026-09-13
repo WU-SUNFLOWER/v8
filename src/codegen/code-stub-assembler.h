@@ -324,8 +324,7 @@ enum class PrimitiveType { kBoolean, kNumber, kString, kSymbol };
 #define CSA_DCHECK_JS_ARGC_EQ(csa, expected) \
   CSA_DCHECK_JS_ARGC_OP(csa, Word32Equal, ==, expected)
 
-#define CSA_DEBUG_INFO(name) \
-  { #name, __FILE__, __LINE__ }
+#define CSA_DEBUG_INFO(name) {#name, __FILE__, __LINE__}
 #define BIND(label) Bind(label, CSA_DEBUG_INFO(label))
 #define TYPED_VARIABLE_DEF(type, name, ...) \
   TVariable<type> name(CSA_DEBUG_INFO(name), __VA_ARGS__)
@@ -601,13 +600,13 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
 #define HEAP_CONSTANT_ACCESSOR(rootIndexName, rootAccessorName, name)    \
   TNode<RemoveTagged<                                                    \
       decltype(std::declval<ReadOnlyRoots>().rootAccessorName())>::type> \
-      name##Constant();
+  name##Constant();
   HEAP_IMMUTABLE_IMMOVABLE_OBJECT_LIST(HEAP_CONSTANT_ACCESSOR)
 #undef HEAP_CONSTANT_ACCESSOR
 
 #define HEAP_CONSTANT_ACCESSOR(rootIndexName, rootAccessorName, name)          \
   TNode<RemoveTagged<decltype(std::declval<Heap>().rootAccessorName())>::type> \
-      name##Constant();
+  name##Constant();
   HEAP_MUTABLE_IMMOVABLE_OBJECT_LIST(HEAP_CONSTANT_ACCESSOR)
 #undef HEAP_CONSTANT_ACCESSOR
 
@@ -4016,8 +4015,7 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
   TNode<Boolean> Equal(TNode<Object> lhs, TNode<Object> rhs,
                        TNode<Context> context,
                        TVariable<Smi>* var_type_feedback = nullptr) {
-    return Equal(
-        lhs, rhs, [=]() { return context; }, var_type_feedback);
+    return Equal(lhs, rhs, [=]() { return context; }, var_type_feedback);
   }
   TNode<Boolean> Equal(TNode<Object> lhs, TNode<Object> rhs,
                        const LazyNode<Context>& context,
@@ -4263,16 +4261,20 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
   }
   void Print(const char* prefix, TNode<UintPtrT> value);
   void Print(const char* prefix, TNode<Float64T> value);
+  void Print(const char* prefix, TNode<BoolT> value);
+
   void PrintErr(const char* s);
   void PrintErr(const char* prefix, TNode<MaybeObject> tagged_value);
   void PrintErr(TNode<MaybeObject> tagged_value) {
     return PrintErr(nullptr, tagged_value);
   }
+
   void PrintToStream(const char* s, int stream);
   void PrintToStream(const char* prefix, TNode<MaybeObject> tagged_value,
                      int stream);
   void PrintToStream(const char* prefix, TNode<UintPtrT> value, int stream);
   void PrintToStream(const char* prefix, TNode<Float64T> value, int stream);
+  void PrintToStream(const char* prefix, TNode<BoolT> value, int stream);
 
   template <class... TArgs>
   TNode<HeapObject> MakeTypeError(MessageTemplate message,

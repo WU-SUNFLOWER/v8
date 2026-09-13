@@ -16437,6 +16437,10 @@ void CodeStubAssembler::Print(const char* prefix, TNode<Float64T> value) {
   PrintToStream(prefix, value, fileno(stdout));
 }
 
+void CodeStubAssembler::Print(const char* prefix, TNode<BoolT> value) {
+  PrintToStream(prefix, value, fileno(stdout));
+}
+
 void CodeStubAssembler::PrintErr(const char* prefix,
                                  TNode<MaybeObject> tagged_value) {
   PrintToStream(prefix, tagged_value, fileno(stderr));
@@ -16512,6 +16516,11 @@ void CodeStubAssembler::PrintToStream(const char* prefix, TNode<Float64T> value,
   // Args are: <bits 63-48>, <bits 47-32>, <bits 31-16>, <bits 15-0>, stream.
   CallRuntime(Runtime::kDebugPrintFloat, NoContextConstant(), chunks[3],
               chunks[2], chunks[1], chunks[0], SmiConstant(stream));
+}
+
+void CodeStubAssembler::PrintToStream(const char* prefix, TNode<BoolT> value,
+                                      int stream) {
+  PrintToStream(prefix, SelectBooleanConstant(value), stream);
 }
 
 IntegerLiteral CodeStubAssembler::ConstexprIntegerLiteralAdd(
