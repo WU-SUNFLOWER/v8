@@ -625,6 +625,7 @@ IGNITION_HANDLER(SetNamedProperty, InterpreterSetNamedPropertyAssembler) {
   // the paths are controlled by feedback.
   // TODO(v8:12548): refactor SetNamedIC as a subclass of StoreIC, which can be
   // called here.
+  // builtin的实现代码见Builtins::Generate_StoreIC
   Callable ic = Builtins::CallableFor(isolate(), Builtin::kStoreIC);
   SetNamedProperty(ic, NamedPropertyType::kNotOwn);
 }

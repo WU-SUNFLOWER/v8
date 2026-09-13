@@ -805,6 +805,12 @@ TNode<Map> KeyedStoreGenericAssembler::FindCandidateStoreICTransitionMapHandler(
   // Cleared weak reference -> slow
   // weak reference -> simple_transition
   // strong reference -> transition_array
+  //
+  // 根据map的transitions_or_prototype_info字段值的引用类型，决定接下来走哪条路径：
+  // 【weak reference】
+  // 说明该字段指向单一map（持有它的弱引用），因此走simple_transition路径。
+  // 【strong reference】
+  // 说明该字段可能指向一个TransitionArray（持有它的强引用），因此走transition_array路径。
   TVARIABLE(Object, var_transition_map_or_array);
   DispatchMaybeObject(maybe_handler, slow, slow, &simple_transition,
                       &transition_array, &var_transition_map_or_array);
@@ -817,6 +823,8 @@ TNode<Map> KeyedStoreGenericAssembler::FindCandidateStoreICTransitionMapHandler(
 
   BIND(&transition_array);
   {
+    // 从transitions_or_prototype_info字段读出来的var_transition_map_or_array还有可能是一个PrototypeInfo。
+    // 因此还需要通过该字段值的map再次确认其类型。若发现不是TransitionArray，则直接回退走C++慢速路径。
     TNode<Map> maybe_handler_map =
         LoadMap(CAST(var_transition_map_or_array.value()));
     GotoIfNot(IsTransitionArrayMap(maybe_handler_map), slow);
@@ -825,6 +833,8 @@ TNode<Map> KeyedStoreGenericAssembler::FindCandidateStoreICTransitionMapHandler(
     Label if_found_candidate(this);
     TNode<TransitionArray> transitions =
         CAST(var_transition_map_or_array.value());
+    // 在map的TransitionArray当中查找，是否存在已有的迁移路径。
+    // 如果存在，走if_found_candidate；否则直接回退到C++ Runtime慢速路径。
     TransitionLookup(name, transitions, &if_found_candidate, &var_name_index,
                      slow);
 
@@ -871,6 +881,9 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
       readonly(this), try_stub_cache(this);
   TNode<Uint32T> bitfield3 = LoadMapBitField3(receiver_map);
   TNode<Name> name = CAST(p->name());
+
+  // 如果receiver_map中的is_dictionary_map表明，receiver采用字典方式存储属性，
+  // 那么直接进入dictionary_properties路径；否则继续尝试fast_properties路径。
   Branch(IsSetWord32<Map::Bits3::IsDictionaryMapBit>(bitfield3),
          &dictionary_properties, &fast_properties);
 
@@ -880,6 +893,10 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
     TNode<DescriptorArray> descriptors = LoadMapDescriptors(receiver_map);
     Label descriptor_found(this), lookup_transition(this);
     TVARIABLE(IntPtrT, var_name_index);
+
+    // 如果receiver采用的是快速属性存储模式，那么就先去查其map的DescriptorArray，
+    // 看看其中是否已有目标属性名name。
+    // 如果name已存在，那么走descriptor_found路径，否则就走lookup_transition路径。
     DescriptorLookup(name, descriptors, bitfield3,
                      IsAnyDefineOwn() ? slow : &descriptor_found,
                      &var_name_index, &lookup_transition);
@@ -930,6 +947,7 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
       }
     }
 
+    // receiver_map的DescriptorArray中没有目标name，就直接走到这里
     BIND(&lookup_transition);
     {
       Comment("lookup transition");
@@ -1266,6 +1284,8 @@ void KeyedStoreGenericAssembler::StoreIC_NoFeedback() {
 
   GotoIf(TaggedIsSmi(receiver_maybe_smi), &miss);
 
+  // 先尝试CSA快速存对象属性路径
+  // 对于一般的场景，都会先进入EmitGenericPropertyStore()尝试
   {
     TNode<HeapObject> receiver = CAST(receiver_maybe_smi);
     TNode<Map> receiver_map = LoadMap(receiver);
@@ -1283,6 +1303,7 @@ void KeyedStoreGenericAssembler::StoreIC_NoFeedback() {
     }
   }
 
+  // 若快速路径尝试失败，再回退到C++ Runtime慢速路径
   BIND(&miss);
   {
     auto runtime = IsDefineNamedOwn() ? Runtime::kDefineNamedOwnIC_Miss

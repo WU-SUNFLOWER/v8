@@ -3817,10 +3817,12 @@ void AccessorAssembler::StoreIC(const StoreICParameters* p) {
                       &miss);
   }
 
+  // 当前函数还没有初始化feedback vector，直接走到这里
   BIND(&no_feedback);
   {
     // TODO(v8:12548): refactor SetNamedIC as a subclass of StoreIC, which can
     // be called here and below when !p->IsDefineNamedOwn().
+    // Builtin::kStoreIC_NoFeedback的实现见KeyedStoreGenericAssembler::StoreIC_NoFeedback()
     auto builtin = p->IsDefineNamedOwn() ? Builtin::kDefineNamedOwnIC_NoFeedback
                                          : Builtin::kStoreIC_NoFeedback;
     TailCallBuiltin(builtin, p->context(), p->receiver(), p->name(),
