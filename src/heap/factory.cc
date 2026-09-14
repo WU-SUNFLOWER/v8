@@ -2453,6 +2453,12 @@ DEFINE_ERROR(WasmLinkError, wasm_link_error)
 DEFINE_ERROR(WasmRuntimeError, wasm_runtime_error)
 #undef DEFINE_ERROR
 
+// V8中能走到NewFunctionPrototype这个函数主要有两种场景：
+// （1）用户JS代码查询某个JavaScript函数的prototype属性，但该函数还未初始化其prototype属性。
+//        - 参见：GetFunctionPrototype()
+// （2）用户JS代码通过new运算符调用某个JavaScript函数，但该函数还未初始化其prototype属性。
+//        - 参见：JSObject::New() -> JSFunction::GetDerivedMap() ->
+//               JSFunction::EnsureHasInitialMap()
 Handle<JSObject> Factory::NewFunctionPrototype(Handle<JSFunction> function) {
   // Make sure to use globals from the function's context, since the function
   // can be from a different context.
