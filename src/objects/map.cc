@@ -1172,6 +1172,19 @@ bool Map::MayHaveReadOnlyElementsInPrototypeChain(Isolate* isolate) {
   return false;
 }
 
+// Map::RawCopy() 这个函数不会拷贝源 Map 对象的 instance_descriptors，这是
+// V8 作者有意而为之的设计。
+//
+// 取而代之，V8 中为了避免频繁拷贝 DescriptorArray，引入了更加精细的管理策略：
+// （1）在必要的场景，优先使 transition tree 中多个 Map 共享同一个数组，
+//      而避免直接拷贝。
+// （2）当多个 Map 对象共享同一个数组时，再分别通过各自的
+//      number_of_own_descriptors 字段控制自己可使用的数组前缀范围。
+// （3）一般地，当多个 Map 对象共享同一数组时，有且只有一个 Map 拥有其所有权。
+//      这个 Map 的 owns_descriptors bit位为true。
+//
+// 这套策略可以在依赖 Map::RawCopy() 的几个主要 Map 拷贝相关函数中得到印证：
+//
 Handle<Map> Map::RawCopy(Isolate* isolate, Handle<Map> src_handle,
                          int instance_size, int inobject_properties) {
   Handle<Map> result = isolate->factory()->NewMap(
