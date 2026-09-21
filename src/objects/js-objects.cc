@@ -4996,6 +4996,13 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
       // First normalize to ensure all JSFunctions are DATA_CONSTANT. Don't use
       // the cache, since we're going to use the normalized version directly,
       // without making a copy.
+      // - 除了在 JSObject::OptimizeAsPrototype 内部，V8中还有别的业务逻辑会调用
+      //   JSObject::NormalizeProperties()。
+      // - 在这个地方，因为接下去还会对 normalize 处理所得的 map 对象执行操作
+      //  （set_is_prototype_map、SetConstructor），所以这里不能使用
+      //   JSObject::NormalizeProperties() 缓存。
+      // - 否则会导致从缓存池内部取出来的 map 对象被污染，对 V8 中其他可能会通过
+      //   JSObject::NormalizeProperties()从缓存池中取map对象的业务逻辑产生影响。
       constexpr bool kUseCache = false;
       JSObject::NormalizeProperties(isolate, object, KEEP_INOBJECT_PROPERTIES,
                                     0, kUseCache,
@@ -5015,6 +5022,7 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
     // memory alive unnecessarily.
     // 将 JavaScript 中的 Object 作为 new_map 所代表类型在 JavaScript
     // 世界中的构造函数。
+    // https://codereview.chromium.org/942493002
     Tagged<Object> maybe_constructor = new_map->GetConstructorRaw();
     Tagged<Tuple2> tuple;
     if (IsTuple2(maybe_constructor)) {
