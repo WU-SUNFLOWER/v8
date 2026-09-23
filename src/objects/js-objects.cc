@@ -4978,6 +4978,9 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
       // This is the only way PrototypeBenefitsFromNormalization can be true:
       DCHECK(!object->map()->should_be_fast_prototype_map());
       // First normalize to ensure all JSFunctions are DATA_CONSTANT.
+      // 这里把kUseCache开关打开其实没啥屌用。
+      // JSObject::NormalizeProperties()最终会走到Map::Normalize()，其中规定：
+      // 如果`fast_map->is_prototype_map()`成立，则强制令`use_cache = false`。
       constexpr bool kUseCache = true;
       JSObject::NormalizeProperties(isolate, object, KEEP_INOBJECT_PROPERTIES,
                                     0, kUseCache, "NormalizeAsPrototype");
