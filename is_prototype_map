@@ -1,0 +1,14 @@
+acc1e2b104772c1cd76a53c1615957e7845bc697 2026-01-21 [array-buffer] Fix updating detached typed array map
+e578e5addab3b77b017ea7ce1a2ec19e4c442beb 2024-06-12 Reland "Retrieve native context from known fields"
+0ba42aeb3a431168a13f0a456b8e878d511afde9 2024-06-11 Revert "Retrieve native context from known fields"
+be4d52e12f413b3088b2e6868862a632a5c20d8e 2024-06-11 Retrieve native context from known fields
+e51a0c9bca50b60c5c166eb8f439248ff8487584 2024-05-08 Reland^2 "[maps] Always apply prototype transitions first"
+162ba27c9e508a091229599d140944e1525ce3f5 2024-04-19 Revert "Reland "[maps] Always apply prototype transitions first""
+691994350012ad50dcf8fbf91f30de4d90279ce7 2024-04-18 Reland "[maps] Always apply prototype transitions first"
+238ccdef912926b26981159a88f16dd81d384da7 2019-02-01 Extract Map class from objects.cc
+882080c49974703fb788927675bd9a7287039086 2018-06-25 [GetIsolate] Remove GetIsolate use in Map
+4204c72739a111c19b68b4fcd28e3591fd360249 2015-04-17 Don't use normalized map cache for prototype maps
+c8e8806f9e54a027d667425f1bb1b28cf9cbb6f7 2014-05-05 Version 3.26.30 (based on bleeding_edge revision r21129)
+ca2def98a58b242ac3f6139ced839a2f5d5874ab 2014-05-02 Map::Normalize() introduced as single entry point for map normalization and Map::NotifyLeafMapLayoutChange() made private.
+c2e08d7d6b03e672e13fc3bf274a292009decce6 2014-04-15 Version 3.26.15 (based on bleeding_edge revision r20740)
+494bf01e537f96e2d68da075904bb3d7784c45e2 2014-04-14 Initial steps for moving code onto Map

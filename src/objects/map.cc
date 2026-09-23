@@ -2212,6 +2212,11 @@ bool Map::EquivalentToForElementsKindTransition(const Tagged<Map> other,
   return true;
 }
 
+// this与other归一化后得到的新Map对象，全等吗？
+// normalized_map ≌ Normalize(fast_map) ？
+//
+// this   = normalized_map   cache 里已经存在的慢属性/dictionary Map
+// other  = fast_map         这次想要 normalize 的原始 Map
 bool Map::EquivalentToForNormalization(const Tagged<Map> other,
                                        ElementsKind elements_kind,
                                        PropertyNormalizationMode mode) const {
