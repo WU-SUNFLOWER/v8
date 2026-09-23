@@ -385,11 +385,20 @@ int Map::UnusedPropertyFields() const {
   int value = used_or_unused_instance_size_in_words();
   DCHECK_IMPLIES(!IsJSObjectMap(*this), value == 0);
   int unused;
+  // 这里if...else能成立的原因在于：
+  // （1）对于一个JS对象，它已使用的tagged word槽位数，
+  //      一定>=kFieldsAdded（map_word字段+properties字段+element字段）。
+  // （2）对于一个JS对象，它的PropertyArray空闲槽位数，
+  //      一定<=kFieldsAdded-1（-1是因为数组扩容后马上要使用掉一个槽位来存新写入的属性），即<3。
   if (value >= JSObject::kFieldsAdded) {
+    // 按"used_instance_size_in_words"解释value。
+    // 此时value表示"对象自身已经用掉了几个tagged word的空间"。
     unused = instance_size_in_words() - value;
   } else {
     // For out of object properties "used_or_unused_instance_size_in_words"
     // byte encodes the slack in the property array.
+    // 按"unused_instance_size_in_words"解释value。
+    // 此时value表示对象PropertyArray中还剩几个空闲槽位。
     unused = value;
   }
   return unused;

@@ -876,6 +876,9 @@ class JSObject : public TorqueGeneratedJSObject<JSObject, JSReceiver> {
   // When extending the backing storage for property values, we increase
   // its size by more than the 1 entry necessary, so sequentially adding fields
   // to the same object requires fewer allocations and copies.
+  // kFieldsAdded同时包含两层意思：
+  // （1）每次扩展PropertyArray时，V8按kFieldsAdded个field一个批次增加容量。
+  // （2）它恰好等于 JSObject 的 header 有多少个 tagged words。
   static const int kFieldsAdded = 3;
   static_assert(kMaxNumberOfDescriptors + kFieldsAdded <=
                 PropertyArray::kMaxLength);
