@@ -1228,6 +1228,8 @@ Handle<Map> Map::Normalize(Isolate* isolate, Handle<Map> fast_map,
 
   Handle<Object> maybe_cache(isolate->native_context()->normalized_map_cache(),
                              isolate);
+  // 如果要归一化的fast_map是一个prototype map，
+  // 或者缓存数据结构不存在，那么强制关闭use_cache开关。
   if (fast_map->is_prototype_map() || IsUndefined(*maybe_cache, isolate)) {
     use_cache = false;
   }
@@ -1301,6 +1303,12 @@ Handle<Map> Map::Normalize(Isolate* isolate, Handle<Map> fast_map,
 Handle<Map> Map::CopyNormalized(Isolate* isolate, Handle<Map> map,
                                 PropertyNormalizationMode mode) {
   int new_instance_size = map->instance_size();
+  // 如果mode为CLEAR_INOBJECT_PROPERTIES，那么就释放in-object
+  // filed槽位占据的空间。
+  //
+  // 这里先把新创建map中存储的instance_size字段更新掉。
+  // 后续相关JS对象向新Map migrate时，会发现新map的instance_size
+  // 字段值比旧map小，便会进一步调用`heap->NotifyObjectSizeChange`通知到虚拟机堆。
   if (mode == CLEAR_INOBJECT_PROPERTIES) {
     new_instance_size -= map->GetInObjectProperties() * kTaggedSize;
   }
@@ -1313,7 +1321,11 @@ Handle<Map> Map::CopyNormalized(Isolate* isolate, Handle<Map> map,
     Tagged<Map> raw = *result;
     // Clear the unused_property_fields explicitly as this field should not
     // be accessed for normalized maps.
+    // 处于normalize状态下的JS对象不应该使用in-object field存储属性，
+    // 因此无论当前mode是否取CLEAR_INOBJECT_PROPERTIES，这里都需要将
+    // map的UnusedPropertyFields置为0.
     raw->SetInObjectUnusedPropertyFields(0);
+    // 明确标记新创建的map是一个dictionary map
     raw->set_is_dictionary_map(true);
     raw->set_is_migration_target(false);
     raw->set_may_have_interesting_properties(true);

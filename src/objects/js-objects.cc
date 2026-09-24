@@ -3387,6 +3387,12 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
   Handle<Map> map(object->map(isolate), isolate);
 
   // Allocate new content.
+  // 先计算要新申请的dictionary的大小。
+  // 计算方法很简单，先从旧的fast map中读取出实际拥有的descriptor数目
+  // （快速模式下，JS对象中的每个属性，都对应map中的一个descriptor），
+  // 然后再加上外部传入的expected_additional_properties（例如外部代码
+  // 马上要添加新属性，那么这个值就可能不为0）或者默认的kInitialCapacity，
+  // 得出最终的property_count。
   int real_size = map->NumberOfOwnDescriptors();
   int property_count = real_size;
   if (expected_additional_properties > 0) {
@@ -3401,6 +3407,7 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
 
   Handle<NameDictionary> dictionary;
   Handle<SwissNameDictionary> ord_dictionary;
+  // 实际在堆上分配dictionary
   if constexpr (V8_ENABLE_SWISS_NAME_DICTIONARY_BOOL) {
     ord_dictionary = isolate->factory()->NewSwissNameDictionary(property_count);
   } else {
@@ -3409,12 +3416,18 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
 
   Handle<DescriptorArray> descs(map->instance_descriptors(isolate), isolate);
   for (InternalIndex i : InternalIndex::Range(real_size)) {
+    // 从descriptor array中读出第 i 个属性的property details和key（属性名）。
     PropertyDetails details = descs->GetDetails(i);
     Handle<Name> key(descs->GetKey(isolate, i), isolate);
     Handle<Object> value;
     if (details.location() == PropertyLocation::kField) {
       FieldIndex index = FieldIndex::ForDetails(*map, details);
       if (details.kind() == PropertyKind::kData) {
+        // 从JS对象的in-object field或者property array中读出属性值。
+        //
+        // 注意，当属性kind为kData时，不能通过`descs->GetValue()`来读，
+        // 因为这时descriptor array中存的所谓value是描述属性值的FieldType，
+        // 不是实际的属性值。
         value = handle(object->RawFastPropertyAt(isolate, index), isolate);
         if (details.representation().IsDouble()) {
           DCHECK(IsHeapNumber(*value, isolate));
@@ -3427,6 +3440,7 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
       }
 
     } else {
+      // 当属性kind为kDescriptor（既非kData）时，直接通过`descs->GetValue()`来读
       DCHECK_EQ(PropertyLocation::kDescriptor, details.location());
       value = handle(descs->GetStrongValue(isolate, i), isolate);
     }
@@ -3436,6 +3450,7 @@ void MigrateFastToSlow(Isolate* isolate, Handle<JSObject> object,
                                       : PropertyConstness::kMutable;
     PropertyDetails d(details.kind(), details.attributes(), constness);
 
+    // 将取出来的属性写入新创建的字典
     if constexpr (V8_ENABLE_SWISS_NAME_DICTIONARY_BOOL) {
       ord_dictionary =
           SwissNameDictionary::Add(isolate, ord_dictionary, key, value, d);
@@ -4978,7 +4993,7 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
       // This is the only way PrototypeBenefitsFromNormalization can be true:
       DCHECK(!object->map()->should_be_fast_prototype_map());
       // First normalize to ensure all JSFunctions are DATA_CONSTANT.
-      // 这里把kUseCache开关打开其实没啥屌用。
+      // 这里把kUseCache开关打开其实没啥屌用，可能是V8作者编写代码时的失误。
       // JSObject::NormalizeProperties()最终会走到Map::Normalize()，其中规定：
       // 如果`fast_map->is_prototype_map()`成立，则强制令`use_cache = false`。
       constexpr bool kUseCache = true;
