@@ -4983,12 +4983,18 @@ static bool PrototypeBenefitsFromNormalization(Tagged<JSObject> object) {
 }
 
 // static
+// JSObject::OptimizeAsPrototype()同时承担了"将新创建的原型对象切入慢速模式"
+// 和"将即将参与JS属性读写操作的原型对象，切回快速模式"的职责。
 void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
                                    bool enable_setup_mode) {
   DCHECK(IsJSObjectThatCanBeTrackedAsPrototype(*object));
   if (IsJSGlobalObject(*object)) return;
   Isolate* isolate = object->GetIsolate();
   if (object->map()->is_prototype_map()) {
+    // 以下两个if语句的成立条件互斥（object->map()->should_be_fast_prototype_map()是否成立），
+    // 因此最多只有一个if语句会执行。
+
+    // 如果JS原型对象的map已经被标记为了prototype map，那么尝试对其进行归一化。
     if (enable_setup_mode && PrototypeBenefitsFromNormalization(*object)) {
       // This is the only way PrototypeBenefitsFromNormalization can be true:
       DCHECK(!object->map()->should_be_fast_prototype_map());
@@ -5000,6 +5006,11 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
       JSObject::NormalizeProperties(isolate, object, KEEP_INOBJECT_PROPERTIES,
                                     0, kUseCache, "NormalizeAsPrototype");
     }
+
+    // 如果JS原型对象的map在上游（如JSObject::MakePrototypesFast()）已经被标记为了
+    // should_be_fast_prototype_map，则说明用户的JavaScript代码执行过程中，可能已经
+    // 需要该JS原型对象参与属性的读写了。
+    // 那么此时尝试将该JS原型对象的属性存储方式，从慢速模式切回快速模式。
     if (!V8_DICT_PROPERTY_CONST_TRACKING_BOOL &&
         object->map()->should_be_fast_prototype_map() &&
         !object->HasFastProperties()) {
@@ -5007,6 +5018,21 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
     }
   } else {
     Handle<Map> new_map;
+    // 如果当前JS原型对象的map还未被标记为prototype map，说明这个时候该JS原型
+    // 对象很有可能才刚刚被创建出来，还没有被用户的JavaScript代码写入原型属性。
+    // V8作者认为，属性添加完毕前中间状态的原型对象的map通常没有意义，更遑论为
+    // 它们维护transition tree了。
+    // 因此在这一阶段的原型对象，应当统一使用慢速模式来存储属性，从而完全绕开
+    // map transition的流程。
+    //
+    // 那么：
+    // （1）如果JS对象还没降级为慢速模式，那么先进行归一化
+    //     （归一化会产生一个新的dictionary map）。
+    // （2）如果JS对象已经降级为慢速模式了，那么直接拷贝一份旧Map作为新Map。
+    //      这样这个新Map与旧Map所处的transition tree就没有关系了
+    //     （V8中约定prototype map不参与transition tree）。
+    //
+    //  处理完毕后，最后还需要给新Map打上is_prototype_map标记。
     if (enable_setup_mode && PrototypeBenefitsFromNormalization(*object)) {
 #if DEBUG
       Handle<Map> old_map = handle(object->map(isolate), isolate);
