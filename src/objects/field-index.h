@@ -48,6 +48,8 @@ class FieldIndex final {
   uint64_t bit_field() const { return bit_field_; }
 
   // Zero-indexed from beginning of the object.
+  // FieldIndex本身描述的是相对于JS对象本身或它的PropertyArray的起始位置的偏移，
+  // 不是相对于JS对象或PropertyArray的header的结束位置的偏移!
   int index() const {
     DCHECK(IsAligned(offset(), kTaggedSize));
     return offset() / kTaggedSize;
