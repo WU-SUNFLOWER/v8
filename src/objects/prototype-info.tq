@@ -22,6 +22,7 @@ extern class PrototypeInfo extends Struct {
 
   // [registry_slot]: Slot in prototype's user registry where this user
   // is stored. Returns UNREGISTERED if this prototype has not been registered.
+  // 当前原型Map在其上游原型Map（的PrototypeInfo）的prototype_users数组中的下标位置。
   registry_slot: Smi;
 
   bit_field: SmiTagged<PrototypeInfoFlags>;
