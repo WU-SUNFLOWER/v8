@@ -117,7 +117,8 @@ Handle<Object> LoadHandler::LoadFromPrototype(
     Handle<JSReceiver> holder, Tagged<Smi> smi_handler,
     MaybeObjectHandle maybe_data1, MaybeObjectHandle maybe_data2) {
   MaybeObjectHandle data1;
-  // （1）如果要直接缓存目标属性值，那么就通过maybe_data1带进来。
+  // （1）如果要直接缓存目标属性值（针对当前仍被标记为PropertyConstness::kConst的属性），
+  //      那么就通过maybe_data1带进来。
   // （2）如果不缓存目标属性值，就取持有目标属性值的holder作为data1。
   if (maybe_data1.is_null()) {
     data1 = MaybeObjectHandle::Weak(holder);
