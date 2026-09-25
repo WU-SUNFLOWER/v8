@@ -4261,6 +4261,7 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
   }
   void Print(const char* prefix, TNode<UintPtrT> value);
   void Print(const char* prefix, TNode<Float64T> value);
+  void Print(const char* prefix, TNode<Uint32T> value);
   void Print(const char* prefix, TNode<BoolT> value);
 
   void PrintErr(const char* s);
@@ -4274,6 +4275,7 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
                      int stream);
   void PrintToStream(const char* prefix, TNode<UintPtrT> value, int stream);
   void PrintToStream(const char* prefix, TNode<Float64T> value, int stream);
+  void PrintToStream(const char* prefix, TNode<Uint32T> value, int stream);
   void PrintToStream(const char* prefix, TNode<BoolT> value, int stream);
 
   template <class... TArgs>

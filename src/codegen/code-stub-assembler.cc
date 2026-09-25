@@ -16433,6 +16433,10 @@ void CodeStubAssembler::Print(const char* prefix, TNode<UintPtrT> value) {
   PrintToStream(prefix, value, fileno(stdout));
 }
 
+void CodeStubAssembler::Print(const char* prefix, TNode<Uint32T> value) {
+  PrintToStream(prefix, value, fileno(stdout));
+}
+
 void CodeStubAssembler::Print(const char* prefix, TNode<Float64T> value) {
   PrintToStream(prefix, value, fileno(stdout));
 }
@@ -16484,6 +16488,36 @@ void CodeStubAssembler::PrintToStream(const char* prefix, TNode<UintPtrT> value,
   }
 
   // Args are: <bits 63-48>, <bits 47-32>, <bits 31-16>, <bits 15-0>, stream.
+  CallRuntime(Runtime::kDebugPrintWord, NoContextConstant(), chunks[3],
+              chunks[2], chunks[1], chunks[0], SmiConstant(stream));
+}
+
+void CodeStubAssembler::PrintToStream(const char* prefix, TNode<Uint32T> value,
+                                      int stream) {
+  if (prefix != nullptr) {
+    std::string formatted(prefix);
+    formatted += ": ";
+    Handle<String> string =
+        isolate()->factory()->InternalizeString(formatted.c_str());
+    CallRuntime(Runtime::kGlobalPrint, NoContextConstant(),
+                HeapConstantNoHole(string), SmiConstant(stream));
+  }
+
+  // We use 16 bits per chunk.
+  TNode<Smi> chunks[4];
+
+  for (int i = 0; i < 2; ++i) {
+    chunks[i] = SmiFromUint32(
+        ReinterpretCast<Uint32T>(Word32And(value, Int32Constant(0xFFFF))));
+    value = ReinterpretCast<Uint32T>(Word32Shr(value, Int32Constant(16)));
+  }
+
+  // Uint32T only has 32 bits, so bits 63-32 are zero.
+  chunks[2] = SmiConstant(0);
+  chunks[3] = SmiConstant(0);
+
+  // Args are: <bits 63-48>, <bits 47-32>,
+  //           <bits 31-16>, <bits 15-0>, stream.
   CallRuntime(Runtime::kDebugPrintWord, NoContextConstant(), chunks[3],
               chunks[2], chunks[1], chunks[0], SmiConstant(stream));
 }
