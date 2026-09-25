@@ -1137,8 +1137,9 @@ MaybeObjectHandle LoadIC::ComputeHandler(LookupIterator* lookup) {
               isolate(), map, holder, *smi_handler, weak_value));
         }
       }
-      // 如果原型对象中的属性没有被标记为const，那么缓存原型对象本身（即这里的holder）；
-      // smi handler中的缓存类型为默认的Kind::kField。
+      // 如果原型对象中的属性没有被标记为const，那么缓存原型对象本身（即这里的holder）。
+      // smi handler中的缓存类型为默认的Kind::kField；
+      // 同时smi handler中也包含了属性在原型对象中的下标位置。
       return MaybeObjectHandle(
           LoadHandler::LoadFromPrototype(isolate(), map, holder, *smi_handler));
     }
