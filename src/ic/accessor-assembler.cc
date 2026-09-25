@@ -325,6 +325,7 @@ void AccessorAssembler::HandleLoadAccessor(
                                  p->receiver()));
 }
 
+// kField 类型的 LoadHandler IC 处理程序
 void AccessorAssembler::HandleLoadField(TNode<JSObject> holder,
                                         TNode<Word32T> handler_word,
                                         TVariable<Float64T>* var_double_value,
@@ -333,16 +334,23 @@ void AccessorAssembler::HandleLoadField(TNode<JSObject> holder,
   Comment("LoadField");
   TNode<IntPtrT> index =
       Signed(DecodeWordFromWord32<LoadHandler::FieldIndexBits>(handler_word));
+  // 计算`index*kTaggedSize`，得到属性值相对于JS对象或PropertyArray起始位置的偏移。
   TNode<IntPtrT> offset = IntPtrMul(index, IntPtrConstant(kTaggedSize));
 
   TNode<BoolT> is_inobject =
       IsSetWord32<LoadHandler::IsInobjectBits>(handler_word);
+  // 如果load handler中记录了属性值位于in-object field，
+  // 那么property_storage取JS对象本身；否则就先取出JS对象
+  // 的PropertyArray作为property_storage。
   TNode<HeapObject> property_storage = Select<HeapObject>(
       is_inobject, [&]() { return holder; },
       [&]() { return LoadFastProperties(holder, true); });
 
   Label is_double(this);
+  // 直接从property_storage中按偏移量取值
   TNode<Object> value = LoadObjectField(property_storage, offset);
+  // 如果属性值在load handler中被标记为`is double`，则进一步走is_double路径；
+  // 否则属性读取IC处理流程已完成，直接返回取到的属性值即可。
   GotoIf(IsSetWord32<LoadHandler::IsDoubleBits>(handler_word), &is_double);
   exit_point->Return(value);
 
@@ -646,6 +654,7 @@ void AccessorAssembler::HandleLoadICSmiHandlerCase(
     HandleLoadICSmiHandlerHasNamedCase(p, holder, handler_kind, miss,
                                        exit_point, ic_mode);
   } else {
+    // 读取JS对象属性操作，走这儿
     HandleLoadICSmiHandlerLoadNamedCase(
         p, holder, handler_kind, handler_word, &rebox_double, &var_double_value,
         handler, miss, exit_point, ic_mode, on_nonexistent, support_elements);
@@ -667,6 +676,8 @@ void AccessorAssembler::HandleLoadICSmiHandlerLoadNamedCase(
       native_data_property(this, Label::kDeferred),
       api_getter(this, Label::kDeferred);
 
+  // 根据LoadHandler的具体类型，
+  // 将程序控制流分发到相应的处理路径，来真正读取JS对象属性值。
   GotoIf(Word32Equal(handler_kind, LOAD_KIND(kField)), &field);
 
   GotoIf(Word32Equal(handler_kind, LOAD_KIND(kConstantFromPrototype)),
