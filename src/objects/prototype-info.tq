@@ -15,6 +15,7 @@ extern class PrototypeInfo extends Struct {
 
   // [prototype_users]: WeakArrayList containing weak references to maps using
   // this prototype, or Smi(0) if uninitialized.
+  // 记录全体依赖该Map所对应的JS原型对象的下游JS原型对象的Map
   prototype_users: WeakArrayList|Zero;
 
   prototype_chain_enum_cache: FixedArray|Zero|Undefined;

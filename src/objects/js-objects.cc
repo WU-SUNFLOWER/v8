@@ -5066,7 +5066,8 @@ void JSObject::OptimizeAsPrototype(Handle<JSObject> object,
     // memory alive unnecessarily.
     // 将 JavaScript 中的 Object 作为 new_map 所代表类型在 JavaScript
     // 世界中的构造函数。
-    // https://codereview.chromium.org/942493002
+    // 这种做法的动机与合理性，见
+    // docs/why-v8-set-Object-as-the-constructor-of-prototype-object-when-optimizing.md
     Tagged<Object> maybe_constructor = new_map->GetConstructorRaw();
     Tagged<Tuple2> tuple;
     if (IsTuple2(maybe_constructor)) {
