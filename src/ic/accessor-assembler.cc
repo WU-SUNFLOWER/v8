@@ -1612,6 +1612,9 @@ TNode<BoolT> AccessorAssembler::IsPropertyDetailsConst(TNode<Uint32T> details) {
       Int32Constant(static_cast<int32_t>(PropertyConstness::kConst)));
 }
 
+// 当do_transitioning_store为true时，
+// 表示object_map是为了新添加value属性而刚刚新transition出来的Map，
+// 因此在添加属性前，需要先将object所使用的map更新为object_map。
 void AccessorAssembler::OverwriteExistingFastDataProperty(
     TNode<HeapObject> object, TNode<Map> object_map,
     TNode<DescriptorArray> descriptors, TNode<IntPtrT> descriptor_name_index,
@@ -1623,6 +1626,9 @@ void AccessorAssembler::OverwriteExistingFastDataProperty(
              Word32Equal(DecodeWord32<PropertyDetails::KindField>(details),
                          Int32Constant(static_cast<int>(PropertyKind::kData))));
 
+  // property details中存储的PropertyLocation位，
+  // 表明属性值是作为普通字段值存储，还是直接存在descriptor array内部。
+  // 据此决定走if_field还是if_descriptor路径。
   Branch(Word32Equal(
              DecodeWord32<PropertyDetails::LocationField>(details),
              Int32Constant(static_cast<int32_t>(PropertyLocation::kField))),
@@ -1645,6 +1651,9 @@ void AccessorAssembler::OverwriteExistingFastDataProperty(
         LoadMapInstanceSizeInWords(object_map);
 
     Label inobject(this), backing_store(this);
+    // 通过field_index和instance_size_in_words的关系，
+    // 推算属性值是存在in-object field，还是存在property array里。
+    // 据此决定走inobject路径，还是backing_store路径。
     Branch(UintPtrLessThan(field_index, instance_size_in_words), &inobject,
            &backing_store);
 
@@ -1652,6 +1661,9 @@ void AccessorAssembler::OverwriteExistingFastDataProperty(
     {
       TNode<IntPtrT> field_offset = Signed(TimesTaggedSize(field_index));
       Label tagged_rep(this), double_rep(this);
+      // 如果目标属性的representation被标记为kDouble，那么走特殊的double_rep处理路径；
+      // 否则一律走通用的tagged_rep处理路径。
+      // ps：V8作者的这个命名不太准确，走tagged_rep路径，目标属性当前的representation不一定需要被标记为kTagged。
       Branch(
           Word32Equal(representation, Int32Constant(Representation::kDouble)),
           &double_rep, &tagged_rep);
@@ -1659,12 +1671,16 @@ void AccessorAssembler::OverwriteExistingFastDataProperty(
       {
         TNode<Float64T> double_value = ChangeNumberToFloat64(CAST(value));
         if (do_transitioning_store) {
+          // 在do_transitioning_store==true的情况下，value对应的属性是
+          // 首次新添加进object的属性，因此需要首先在堆上创建一个新的HeapNumber来存值。
           TNode<HeapNumber> heap_number =
               AllocateHeapNumberWithValue(double_value);
           StoreMap(object, object_map);
           StoreObjectField(object, field_offset, heap_number);
         } else {
+          // 如果属性被标记为PropertyConstness::kConst，那么直接退化走C++慢速路径（Runtime::kStoreIC_Miss）。
           GotoIf(IsPropertyDetailsConst(details), slow);
+          // 否则直接就地更新现有HeapNumber对象的內部值，不创建新的HeapNumber对象。
           TNode<HeapNumber> heap_number =
               CAST(LoadObjectField(object, field_offset));
           StoreHeapNumberValue(heap_number, double_value);
@@ -1677,6 +1693,7 @@ void AccessorAssembler::OverwriteExistingFastDataProperty(
         if (do_transitioning_store) {
           StoreMap(object, object_map);
         } else {
+          // 如果属性被标记为PropertyConstness::kConst，那么直接退化走C++慢速路径（Runtime::kStoreIC_Miss）。
           GotoIf(IsPropertyDetailsConst(details), slow);
         }
         StoreObjectField(object, field_offset, value);
