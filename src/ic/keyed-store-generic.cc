@@ -896,7 +896,8 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
 
     // 如果receiver采用的是快速属性存储模式，那么就先去查其map的DescriptorArray，
     // 看看其中是否已有目标属性名name。
-    // 如果name已存在，那么走descriptor_found路径，否则就走lookup_transition路径。
+    // 如果name已存在，那么把下标存进var_name_index，然后走descriptor_found路径；
+    // 否则就走lookup_transition路径。
     DescriptorLookup(name, descriptors, bitfield3,
                      IsAnyDefineOwn() ? slow : &descriptor_found,
                      &var_name_index, &lookup_transition);
@@ -907,8 +908,11 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
       BIND(&descriptor_found);
       {
         TNode<IntPtrT> name_index = var_name_index.value();
+        // 从DescriptorArray中提取属性对应的property details
         TNode<Uint32T> details = LoadDetailsByKeyIndex(descriptors, name_index);
         Label data_property(this);
+        // 如果property details中将属性标记为PropertyKind::kData，
+        // 那么就直接走data_property路径。
         JumpIfDataProperty(details, &data_property,
                            ShouldReconfigureExisting() ? nullptr : &readonly);
 
@@ -928,6 +932,7 @@ void KeyedStoreGenericAssembler::EmitGenericPropertyStore(
         BIND(&data_property);
         {
           Label shared(this);
+          // SharedStruct是V8的内部机制，不是JavaScript/ECMAScript层面的概念，这里我们先不管！
           GotoIf(IsJSSharedStructInstanceType(instance_type), &shared);
 
           CheckForAssociatedProtector(name, slow);
