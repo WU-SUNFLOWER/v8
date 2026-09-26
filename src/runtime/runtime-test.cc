@@ -1585,6 +1585,18 @@ RUNTIME_FUNCTION(Runtime_PrintSharedFunctionInfo) {
   return ReadOnlyRoots(isolate).undefined_value();
 }
 
+RUNTIME_FUNCTION(Runtime_GetCurrentFunction) {
+  HandleScope scope(isolate);
+  DCHECK_EQ(0, args.length());
+
+  JavaScriptStackFrameIterator it(isolate);
+  if (it.done()) {
+    return ReadOnlyRoots(isolate).undefined_value();
+  }
+
+  return it.frame()->function();
+}
+
 RUNTIME_FUNCTION(Runtime_SystemBreak) {
   // The code below doesn't create handles, but when breaking here in GDB
   // having a handle scope might be useful.

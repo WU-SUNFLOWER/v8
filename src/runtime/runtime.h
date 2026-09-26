@@ -535,6 +535,7 @@ namespace internal {
   F(FinalizeOptimization, 0, 1)               \
   F(ForceFlush, 1, 1)                         \
   F(GetCallable, 0, 1)                        \
+  F(GetCurrentFunction, 0, 1)                 \
   F(GetInitializerFunction, 1, 1)             \
   F(GetOptimizationStatus, 1, 1)              \
   F(GetUndetectable, 0, 1)                    \
