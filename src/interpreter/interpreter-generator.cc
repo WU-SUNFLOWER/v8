@@ -2199,6 +2199,17 @@ IGNITION_HANDLER(JumpIfJSReceiverConstant, InterpreterAssembler) {
 //
 // Jump by the number of bytes represented by the immediate operand |imm|. Also
 // performs a loop nesting check, a stack check, and potentially triggers OSR.
+//
+// JumpLoop 本质上是 Ignition 字节码里的“循环回边跳转（back-edge jump）”。
+// 它负责在一次循环迭代结束后，把解释器的执行位置跳回循环头部（JumpBackward）。
+//
+// 但它又不只是普通的 goto。因为 loop back-edge 是一个非常特殊的位置。
+// 每经过一次 back-edge，就意味着"这个循环又完整执行了一轮。"。
+// 因此它天然适合测量：这个循环究竟有多热？
+//
+// 基于此，V8 特意把“向后跳、继续下一轮循环”设计成独立的 JumpLoop，
+// 这样就可以在这个天然的热点位置顺便做 interrupt budget、stack check、
+// OSR/tiering 等事情。
 IGNITION_HANDLER(JumpLoop, InterpreterAssembler) {
   TNode<IntPtrT> relative_jump = Signed(BytecodeOperandUImmWord(0));
 

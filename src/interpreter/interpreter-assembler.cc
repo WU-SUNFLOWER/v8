@@ -1075,10 +1075,13 @@ void InterpreterAssembler::DecreaseInterruptBudget(
   TNode<Int32T> weight_after_bytecode =
       Int32Add(weight, Int32Constant(CurrentBytecodeSize()));
   TNode<Int32T> new_budget = UpdateInterruptBudget(weight_after_bytecode);
+  // 如果budget消耗殆尽（<0），那么走interrupt_check，进入C++Runtime进一步处理；
+  // 否则走done，让解释器回到正常的字节码解释执行路径。
   Branch(Int32GreaterThanOrEqual(new_budget, Int32Constant(0)), &done,
          &interrupt_check);
 
   BIND(&interrupt_check);
+  // 从JS解释器栈帧的虚拟寄存器中，取出当前正在执行函数对应的JSFunction
   TNode<JSFunction> function = LoadFunctionClosure();
   CallRuntime(stack_check_behavior == kEnableStackCheck
                   ? Runtime::kBytecodeBudgetInterruptWithStackCheck_Ignition
@@ -1121,6 +1124,12 @@ void InterpreterAssembler::Jump(TNode<IntPtrT> jump_offset) {
 }
 
 void InterpreterAssembler::JumpBackward(TNode<IntPtrT> jump_offset) {
+  // 注意：在V8中除了频繁调用JS函数（见Return字节码）；
+  //       每执行一轮循环，也会消耗循环所在JS函数的 interrupt budget！！
+  //
+  // 这里取stack_check_behavior=kEnableStackCheck，表示在budget消耗殆尽，
+  // 进入C++ Runtime流程后，顺带先看一下是否有StackGuard中断需要处理。
+  // 这个设计可以避免V8字节码解释器长时间陷在循环当中，没有处理StackGuard中断的机会。
   DecreaseInterruptBudget(TruncateIntPtrToInt32(jump_offset),
                           kEnableStackCheck);
   JumpToOffset(IntPtrSub(BytecodeOffset(), jump_offset));
