@@ -1880,6 +1880,8 @@ Handle<Map> Map::PrepareForDataProperty(Isolate* isolate, Handle<Map> map,
   return UpdateDescriptorForValue(isolate, map, descriptor, constness, value);
 }
 
+// 这个函数在当前版本的V8中，唯一的调用方为LookupIterator::PrepareTransitionToDataProperty()，
+// 用于在JS对象添加新属性前，先为其生成transition后的新Map。
 Handle<Map> Map::TransitionToDataProperty(Isolate* isolate, Handle<Map> map,
                                           Handle<Name> name,
                                           Handle<Object> value,
@@ -1897,6 +1899,8 @@ Handle<Map> Map::TransitionToDataProperty(Isolate* isolate, Handle<Map> map,
   // Migrate to the newest map before storing the property.
   map = Update(isolate, map);
 
+  // （1）先查旧Map的TransitionArray，看其中是否已经有匹配属性名
+  //      和attributes的下游transition Map。
   MaybeHandle<Map> maybe_transition = TransitionsAccessor::SearchTransition(
       isolate, map, *name, PropertyKind::kData, attributes);
   Handle<Map> transition;
@@ -1907,6 +1911,7 @@ Handle<Map> Map::TransitionToDataProperty(Isolate* isolate, Handle<Map> map,
                               ->GetDetails(descriptor)
                               .attributes());
 
+    // 如果存在匹配的下游Map，那么根据新传入的constness和value更新它当中对应属性的descriptor，然后返回之。
     return UpdateDescriptorForValue(isolate, transition, descriptor, constness,
                                     value);
   }
@@ -1915,6 +1920,12 @@ Handle<Map> Map::TransitionToDataProperty(Isolate* isolate, Handle<Map> map,
   TransitionFlag flag =
       isolate->bootstrapper()->IsActive() ? OMIT_TRANSITION : INSERT_TRANSITION;
   MaybeHandle<Map> maybe_map;
+  // （2）如果旧Map所描述的JS对象还能够在快速模式下承载更多属性，
+  //      那么就做一次常规的map transition：
+  //        - 拷贝一份旧Map作为新Map；
+  //        - 将新添加属性的descriptor写入新Map的descriptor array中；
+  //        - 将新Map写回旧Map的transition array当中（作为旧Map在
+  //          transition tree中的子节点）。
   if (!map->TooManyFastProperties(store_origin)) {
     Representation representation =
         Object::OptimalRepresentation(*value, isolate);
@@ -1925,6 +1936,8 @@ Handle<Map> Map::TransitionToDataProperty(Isolate* isolate, Handle<Map> map,
   }
 
   Handle<Map> result;
+  // （3）如果旧Map所描述的JS对象已无法在快速模式下承载更多属性，
+  //      那么走map normalize流程。
   if (!maybe_map.ToHandle(&result)) {
     const char* reason = "TooManyFastProperties";
 #if V8_TRACE_MAPS

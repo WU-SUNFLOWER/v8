@@ -617,6 +617,8 @@ void LookupIterator::PrepareTransitionToDataProperty(
     return;
   }
 
+  // 在JS对象添加新属性前，先为其生成transition后的新Map。
+  // 注意，V8中默认为新添加属性标记PropertyConstness::kConst。
   Handle<Map> transition =
       Map::TransitionToDataProperty(isolate_, map, name_, value, attributes,
                                     PropertyConstness::kConst, store_origin);
