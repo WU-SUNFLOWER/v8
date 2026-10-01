@@ -323,6 +323,33 @@ class V8_NODISCARD ScopedFullHeapCrashKey {
   Isolate* isolate_ = nullptr;
 };
 
+// JS execution
+//     │
+//     ▼
+// 达到 GC point
+//     │
+//     ▼
+// Heap::PerformGarbageCollection()
+//     │
+//     ▼
+// 进入 Safepoint / atomic pause
+//     │
+//     ▼
+// ScavengerCollector::CollectGarbage()
+//     │
+//     ▼
+//     │
+//     ├── V8 main thread ─────┐
+//     │                       │
+//     ├── GC worker #1 ───────┤
+//     ├── GC worker #2 ───────┤── Parallel Scavenge
+//     └── GC worker #N ───────┘
+//     │
+//     ▼
+// 退出 Safepoint
+//     │
+//     ▼
+// JS execution resumes
 void ScavengerCollector::CollectGarbage() {
   ScopedFullHeapCrashKey collect_full_heap_dump_if_crash(isolate_);
 
@@ -385,6 +412,8 @@ void ScavengerCollector::CollectGarbage() {
     }
     {
       // Parallel phase scavenging all copied and promoted objects.
+      // 这里的 Parallel 指的是"V8主线程 + GC worker 并行做 GC"，
+      // 不是"JavaScript 程序和 GC 并行执行"！！！
       TRACE_GC_ARG1(
           heap_->tracer(), GCTracer::Scope::SCAVENGER_SCAVENGE_PARALLEL_PHASE,
           "UseBackgroundThreads", heap_->ShouldUseBackgroundThreads());
@@ -491,14 +520,13 @@ void ScavengerCollector::CollectGarbage() {
     }
 
 #ifdef DEBUG
-    OldGenerationMemoryChunkIterator::ForAll(
-        heap_, [](MemoryChunk* chunk) {
-          if (chunk->slot_set<OLD_TO_NEW>() ||
-              chunk->typed_slot_set<OLD_TO_NEW>() ||
-              chunk->slot_set<OLD_TO_NEW_BACKGROUND>()) {
-            DCHECK(chunk->possibly_empty_buckets()->IsEmpty());
-          }
-        });
+    OldGenerationMemoryChunkIterator::ForAll(heap_, [](MemoryChunk* chunk) {
+      if (chunk->slot_set<OLD_TO_NEW>() ||
+          chunk->typed_slot_set<OLD_TO_NEW>() ||
+          chunk->slot_set<OLD_TO_NEW_BACKGROUND>()) {
+        DCHECK(chunk->possibly_empty_buckets()->IsEmpty());
+      }
+    });
 #endif
   }
 
@@ -597,8 +625,15 @@ int ScavengerCollector::NumberOfScavengeTasks() {
           MB +
       1;
   static int num_cores = V8::GetCurrentPlatform()->NumberOfWorkerThreads() + 1;
+  // 根据以下三个值，确定参与scavenge gc的线程数：
+  // （1）当前新生代空间大小 / MB + 1；
+  // （2）常量 kMaxScavengerTasks；
+  // （3）可用的后台 worker thread 数量 + 1。
+  // ps: 这里的+1，指的是"V8执行JS代码的主线程也会参与处理GC"。
   int tasks = std::max(
       1, std::min({num_scavenge_tasks, kMaxScavengerTasks, num_cores}));
+  // 如果虚拟机堆总大小已接近上限，无法安全地为晋升操作及老生代扩容预留足够空间，
+  // 则强制令 tasks=1，优先节省GC所消耗的操作系统内存大小。
   if (!heap_->CanPromoteYoungAndExpandOldGeneration(
           static_cast<size_t>(tasks * Page::kPageSize))) {
     // Optimize for memory usage near the heap limit.

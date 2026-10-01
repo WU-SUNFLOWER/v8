@@ -799,7 +799,7 @@ void Heap::DumpJSONHeapStatistics(std::stringstream& stream) {
   HeapStatistics stats;
   reinterpret_cast<v8::Isolate*>(isolate())->GetHeapStatistics(&stats);
 
-// clang-format off
+  // clang-format off
 #define DICT(s) "{" << s << "}"
 #define LIST(s) "[" << s << "]"
 #define QUOTE(s) "\"" << s << "\""
@@ -2780,6 +2780,9 @@ void Heap::Scavenge() {
 
   SetGCState(SCAVENGE);
 
+  // 交换新生代空间中的from半区和to半区，并初始化新的to半区的内存分配状态。
+  // 之后，scavenge gc算法需要将from半区（原to半区）中的存活对象搬迁到
+  // to半区（原from半区）中去。
   SemiSpaceNewSpace::From(new_space())->EvacuatePrologue();
 
   // We also flip the young generation large object space. All large objects

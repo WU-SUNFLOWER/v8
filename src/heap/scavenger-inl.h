@@ -135,6 +135,12 @@ CopyAndForwardResult Scavenger::SemiSpaceCopyObject(
     DCHECK(heap()->marking_state()->IsUnmarked(target));
     const bool self_success =
         MigrateObject(map, object, target, object_size, kPromoteIntoLocalHeap);
+    // 如果搬迁对象失败（例如对象已经被其他线程抢先搬迁过了），那么：
+    // （1）释放刚刚从to space中申请出来的内存；
+    // （2）从当前位于from space中的这个对象的map槽位中读出转发地址，
+    //      回填进slot；
+    // （3）如果转发地址表明对象之前已被搬迁到了老生代，返回SUCCESS_OLD_GENERATION；
+    //      否则返回SUCCESS_YOUNG_GENERATION。
     if (!self_success) {
       allocator_.FreeLast(NEW_SPACE, target, object_size);
       MapWord map_word = object->map_word(kAcquireLoad);
@@ -144,7 +150,11 @@ CopyAndForwardResult Scavenger::SemiSpaceCopyObject(
                  ? CopyAndForwardResult::SUCCESS_YOUNG_GENERATION
                  : CopyAndForwardResult::SUCCESS_OLD_GENERATION;
     }
+    // 将对象移动后在 to 空间中的新地址回填回持有它的对象的 tagged pointer 槽位
     HeapObjectReference::Update(slot, target);
+    // copy 成功之后，如果对象可能包含指针，就放进 local_copied_list_。
+    // 后面Scavenge实例会从 local_copied_list_ 中取出该对象进行消费：
+    //   - 见 Scavenger::Process()
     if (object_fields == ObjectFields::kMaybePointers) {
       copied_list_local_.Push(ObjectAndSize(target, object_size));
     }
@@ -259,11 +269,19 @@ SlotCallbackResult Scavenger::EvacuateObjectDefault(
   SLOW_DCHECK(static_cast<size_t>(object_size) <=
               MemoryChunkLayout::AllocatableMemoryInDataPage());
 
+  // 如果当前对象还没有晋升资格，就尝试搬迁到to空间
   if (!SemiSpaceNewSpace::From(heap()->new_space())
            ->ShouldBePromoted(object.address())) {
     // A semi-space copy may fail due to fragmentation. In that case, we
     // try to promote the object.
+    // 如果搬迁到to空间失败（例如to空间已没有充足的可分配内存），则后续尝试直接晋升对象
     result = SemiSpaceCopyObject(map, slot, object, object_size, object_fields);
+    // 如果对象搬迁后还在新生代空间，返回KEEP_SLOT：
+    //   - 如果当前GC正在处理"被老生代引用的"原新生代对象，
+    //     那么继续保持相应的记忆集槽位不动。
+    // 如果对象搬迁后已进入老生代空间，返回REMOVE_SLOT：
+    //   - 如果当前GC正在处理"被老生代引用的"原新生代对象，
+    //     那么清除相应的记忆集槽位。
     if (result != CopyAndForwardResult::FAILURE) {
       return RememberedSetEntryNeeded(result);
     }
@@ -275,15 +293,19 @@ SlotCallbackResult Scavenger::EvacuateObjectDefault(
   result = PromoteObject<THeapObjectSlot, promotion_heap_choice>(
       map, slot, object, object_size, object_fields);
   if (result != CopyAndForwardResult::FAILURE) {
+    // 同理，晋升结束后需要返回KEEP_SLOT或REMOVE_SLOT。
+    // 如果GC正在处理"被老生代引用的"原新生代对象，就需要据此决定是否维持记忆集槽位。
     return RememberedSetEntryNeeded(result);
   }
 
   // If promotion failed, we try to copy the object to the other semi-space.
+  // 如果晋升失败，尝试将对象搬迁到新生代空间的to空间
   result = SemiSpaceCopyObject(map, slot, object, object_size, object_fields);
   if (result != CopyAndForwardResult::FAILURE) {
     return RememberedSetEntryNeeded(result);
   }
 
+  // 如果上述尝试全部失败，让虚拟机OOM Crash。
   heap()->FatalProcessOutOfMemory("Scavenger: semi-space copy");
   UNREACHABLE();
 }
