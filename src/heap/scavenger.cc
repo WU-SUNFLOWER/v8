@@ -237,7 +237,22 @@ void ScavengerCollector::JobTask::ProcessItems(JobDelegate* delegate,
   double scavenging_time = 0.0;
   {
     TimedScope scope(&scavenging_time);
+    // （1）先与其他gc worker一起协作，并发扫描老生代空间中所有存在
+    // `old to new`引用的page，并对这些被老生代页面引用的新生代对象，
+    // 执行scavenge操作。
+    //
+    // 按一般的GC理论，这些page应该被视作一种"GC Root"，放在
+    // Heap::IterateRoots()中一并处理。但V8没有这么设计，而是将这段
+    // 逻辑推迟到gc worker执行阶段。这么做的动机包括：
+    // - 扫描old page的remembered set并处理`old to new`引用的过程
+    //   更加复杂——要根据scavenge后被引用对象所处的位置，决定是否更新
+    //   remembered set，不方便与其他GC Root一并前置处理。
+    // - 将扫描old page的工作下放给各个gc worker，可以充分利用page分页
+    //   结构的并发性，提高扫描效率；而一般的GC Root则大都不方便并发扫描。
     ConcurrentScavengePages(scavenger);
+    // （2）当所有存在`old to new`引用的page，被全体worker并发处理
+    // 完毕后，当前worker再消费处理自己的copied_list_local_和
+    // promotion_list_local_队列。
     scavenger->Process(delegate);
   }
   if (v8_flags.trace_parallel_scavenge) {
@@ -248,15 +263,25 @@ void ScavengerCollector::JobTask::ProcessItems(JobDelegate* delegate,
   }
 }
 
+// 扫描带`old->new`引用的old page，V8采用"动态认领+切分区间"的并发设计思路；
+// 而非朴素的抢占式认领或者预先分派策略。
+// 详细的设计动机分析，见docs/v8-dynamic-work-claiming-scavenger.md。
 void ScavengerCollector::JobTask::ConcurrentScavengePages(
     Scavenger* scavenger) {
   while (remaining_memory_chunks_.load(std::memory_order_relaxed) > 0) {
+    // 动态确定一个认领区间[index, memory_chunks.size())。
+    // 这可以避免各个gc worker一上来都按i=0,1,2...的顺序竞争各个page。
     base::Optional<size_t> index = generator_.GetNext();
     if (!index) return;
     for (size_t i = *index; i < memory_chunks_.size(); ++i) {
       auto& work_item = memory_chunks_[i];
+      // - 如果发现区间内剩余的page已有其他scavenger处理，则当前
+      //   scavenger无需继续遍历处理当前区间，退出内层循环。
+      // - 否则将当前page标记为"已被认领"，然后进入
+      //   Scavenger::ScavengePage()处理。
       if (!work_item.first.TryAcquire()) break;
       scavenger->ScavengePage(work_item.second);
+      // 当前page处理完毕，将待处理的old page总数原子减一。
       if (remaining_memory_chunks_.fetch_sub(1, std::memory_order_relaxed) <=
           1) {
         return;

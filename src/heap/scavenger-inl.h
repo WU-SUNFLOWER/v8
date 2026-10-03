@@ -451,6 +451,9 @@ SlotCallbackResult Scavenger::ScavengeObject(THeapObjectSlot p,
 
   // If the first word is a forwarding address, the object has already been
   // copied.
+  // 如果当前目标对象所在位置的map word已经一个转发地址了，
+  // 则说明该对象已经被拷贝进to空间了。此时回填slot即可，
+  // 无需再次走EvacuateObject()拷贝对象。
   if (first_word.IsForwardingAddress()) {
     Tagged<HeapObject> dest = first_word.ToForwardingAddress(object);
     HeapObjectReference::Update(p, dest);
@@ -462,6 +465,7 @@ SlotCallbackResult Scavenger::ScavengeObject(THeapObjectSlot p,
     return Heap::InYoungGeneration(dest) ? KEEP_SLOT : REMOVE_SLOT;
   }
 
+  // 否则走常规的evacuate路径（拷贝对象到to空间）
   Tagged<Map> map = first_word.ToMap();
   // AllocationMementos are unrooted and shouldn't survive a scavenge
   DCHECK_NE(ReadOnlyRoots(heap()).allocation_memento_map(), map);
