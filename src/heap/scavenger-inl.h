@@ -553,6 +553,13 @@ void ScavengeVisitor::VisitPointersImpl(Tagged<HeapObject> host, TSlot start,
     typename TSlot::TObject object = *slot;
     Tagged<HeapObject> heap_object;
     // Treat weak references as strong.
+    // 这里V8做了一个工程取舍：
+    // - 在有弱引用存在的系统中，如果要在一次tracing GC中精确地清理
+    //   所有死亡对象，并正确更新所有指针槽位，至少需要两次对象图扫描。
+    // - 而Scavenage GC在V8中的定位是"高频触发、需快速完成"。
+    // - 因此为了加快每次Scavenage GC的速度，V8中直接将对象图中的弱引
+    //   用当作强引用进行扫描，以没有在minor GC阶段彻底清理所有死亡对象
+    //   为代价，换取更快的处理速度。
     if (object.GetHeapObject(&heap_object)) {
       VisitHeapObjectImpl(slot, heap_object);
     }

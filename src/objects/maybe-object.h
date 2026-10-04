@@ -13,6 +13,18 @@ namespace internal {
 // A MaybeObject is either a SMI, a strong reference to a HeapObject, a weak
 // reference to a HeapObject, or a cleared weak reference. It's used for
 // implementing in-place weak references (see design doc: goo.gl/j6SdcK )
+//
+// MaybeObject是一个tagged value容器。注意它的语义为：内部可以承载一个smi、
+// strong reference、weak reference或者cleared weak reference。
+//
+// `TaggedImpl<HeapObjectReferenceType::WEAK, Address>`仅表示容器内部
+// 可以承载weak reference，而不代表内部存的一定是一个weak reference！
+//
+// 通过TaggedImpl::GetHeapObject()可以将MaybeObject转为一个普通的Tagged<HeapObject>。
+// Tagged<HeapObject>的性质为strong reference。
+//
+// 后续版本的V8中已经移除了独立的MaybeObject类，仅保留MaybeObject的概念，见：
+// https://chromium-review.googlesource.com/c/v8/v8/+/5268603
 class MaybeObject : public TaggedImpl<HeapObjectReferenceType::WEAK, Address> {
  public:
   constexpr MaybeObject() : TaggedImpl(kNullAddress) {}

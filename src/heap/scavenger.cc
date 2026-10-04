@@ -396,6 +396,7 @@ void ScavengerCollector::CollectGarbage() {
                         &promotion_list, &ephemeron_table_list, i));
     }
 
+    // 挑出所有带有`old->new`引用的old page
     std::vector<std::pair<ParallelWorkItem, MemoryChunk*>> memory_chunks;
     OldGenerationMemoryChunkIterator::ForAll(
         heap_, [&memory_chunks](MemoryChunk* chunk) {
