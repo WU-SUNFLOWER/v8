@@ -358,6 +358,8 @@ void SemiSpace::set_age_mark(Address mark) {
   Page* age_mark_page = Page::FromAllocationAreaAddress(mark);
   DCHECK_EQ(age_mark_page->owner(), this);
   // Mark all pages up to the one containing mark.
+  // 在SemiSpaceNewSpace::ShouldBePromoted()中，相应地
+  // 会检查传入address所在页面的NEW_SPACE_BELOW_AGE_MARK标记。
   for (Page* p : *this) {
     p->SetFlag(MemoryChunk::NEW_SPACE_BELOW_AGE_MARK);
     if (p == age_mark_page) break;
@@ -742,14 +744,23 @@ void SemiSpaceNewSpace::Prologue() {
 void SemiSpaceNewSpace::EvacuatePrologue() {
   // Flip the semispaces.  After flipping, to space is empty, from space has
   // live objects.
+  // V8中的scavenge gc swap实现，与主流理论资料中的"先拷贝存活对象，
+  // 最后交换两个半区"不太一样，第一次看容易看懵掉。
+  // 这里再捋一下：
+  // - V8新生代空间的时候会得到一个to_space_（对应SemiSpaceId::kToSpace）
+  //   和from_space_（对应SemiSpaceId::kFromSpace）。
+  // - 当JavaScript代码正常运行时，在to_space_上申请空间创建对象。
+  // - 当执行scavenge gc时，首先将to_space_中的数据swap给from_space_
+  //   但不会交换to_space_和from_space_所分别代表的两个实例本身；然后
+  //   再将from_space_中的存活对象拷贝进to_space_现在持有的真实内存空
+  //   间当中去。
+  // - 后续JS代码恢复执行时，继续正常地从to_space_中申请空间。
   SemiSpace::Swap(&from_space_, &to_space_);
   ResetCurrentSpace();
   DCHECK_EQ(0u, Size());
 }
 
-void SemiSpaceNewSpace::GarbageCollectionEpilogue() {
-  set_age_mark_to_top();
-}
+void SemiSpaceNewSpace::GarbageCollectionEpilogue() { set_age_mark_to_top(); }
 
 void SemiSpaceNewSpace::ZapUnusedMemory() {
   if (!IsFromSpaceCommitted()) return;
@@ -1002,9 +1013,7 @@ PagedNewSpace::PagedNewSpace(Heap* heap, size_t initial_capacity,
                              size_t max_capacity)
     : NewSpace(heap), paged_space_(heap, initial_capacity, max_capacity) {}
 
-PagedNewSpace::~PagedNewSpace() {
-  paged_space_.TearDown();
-}
+PagedNewSpace::~PagedNewSpace() { paged_space_.TearDown(); }
 
 AllocatorPolicy* PagedNewSpace::CreateAllocatorPolicy(
     MainAllocator* allocator) {

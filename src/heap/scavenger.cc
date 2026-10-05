@@ -419,6 +419,8 @@ void ScavengerCollector::CollectGarbage() {
     }
     {
       // Copy roots.
+      // 根节点的扫描工作直接放在V8主线程中做，不牵涉后台gc worker，
+      // 这样代码实现最简单。
       TRACE_GC(heap_->tracer(), GCTracer::Scope::SCAVENGER_SCAVENGE_ROOTS);
       // Scavenger treats all weak roots except for global handles as strong.
       // That is why we don't set skip_weak = true here and instead visit
@@ -434,6 +436,9 @@ void ScavengerCollector::CollectGarbage() {
       isolate_->global_handles()->IterateYoungStrongAndDependentRoots(
           &root_scavenge_visitor);
       isolate_->traced_handles()->IterateYoungRoots(&root_scavenge_visitor);
+      // 将gc root扫描阶段发现的存活对象，全部发布到全局的copied_list。
+      // 这样接下来后台的gc worker中就可以从全局copied_list中窃取（steal）
+      // 这些存活对象以进行进一步扫描。
       scavengers[kMainThreadId]->Publish();
     }
     {
@@ -522,6 +527,19 @@ void ScavengerCollector::CollectGarbage() {
   // Need to free new space LAB that was allocated during scavenge.
   heap_->allocator()->new_space_allocator()->FreeLinearAllocationArea();
   // Now that the LAB was freed, set age mark.
+  // V8当中并没有显式的"晋升年龄阈值"，而是默认一个对象如果在第二轮scavenge
+  // gc发生时 仍然存活，就晋升到老年代。
+  //
+  // 具体的实现原理非常简单：
+  // （1）为to space维护一个age_mark水位标记，记录本轮scavenge gc
+  //      结束时，to space已分配内存的末地址；
+  // （2）下一轮scavenge gc发生时，内存地址小于该水位标记的对象，即为从
+  //      上一轮gc的幸存者，那么在本轮gc时就需要晋升。
+  //      源码见SemiSpaceNewSpace::ShouldBePromoted()
+  //
+  // V8没有像HotSpot那样，允许自由调节晋升的年龄阈值，可能原因在于：
+  // scavenge gc在V8中的定位本来就是"足够快、足够轻量"，因此需要尽快将可能
+  // 长期驻留虚拟机堆的对象从新生代空间中转移出去。
   semi_space_new_space->set_age_mark_to_top();
 
   // Since we promote all surviving large objects immediately, all remaining

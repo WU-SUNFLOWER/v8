@@ -4720,7 +4720,10 @@ void Heap::IterateRoots(RootVisitor* v, base::EnumSet<SkipRoot> options,
     v->Synchronize(VisitorSynchronization::kGlobalHandles);
 
     if (!options.contains(SkipRoot::kStack)) {
+      // 精确栈扫描，只会扫处于V8掌控之中的非C++ native栈帧。
       IterateStackRoots(v);
+      // 保守栈扫描，为V8的DirectHandle<T>准备。
+      // 参考https://github.com/v8/v8/blob/main/docs/heap/handles.md
       if (!options.contains(SkipRoot::kConservativeStack)) {
         IterateConservativeStackRoots(v, roots_mode);
       }
@@ -4788,6 +4791,7 @@ void Heap::IterateRoots(RootVisitor* v, base::EnumSet<SkipRoot> options,
     }
   }
 
+  // 如果没有打开SkipRoot::kWeak开关，就将所有弱引用根节点与强引用一并扫描进去
   if (!options.contains(SkipRoot::kWeak)) {
     IterateWeakRoots(v, options);
   }

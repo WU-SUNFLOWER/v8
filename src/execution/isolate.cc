@@ -604,6 +604,27 @@ void Isolate::Iterate(RootVisitor* v, ThreadLocalTop* thread) {
     } while (current != wasm_stacks_);
   }
 #endif  // V8_ENABLE_WEBASSEMBLY
+
+  // 假设现在正在一个 Runtime C++ 函数里触发 GC：
+  //             ┌─────────────────────┐
+  // CPU SP ---> │ Heap::Collect...    │  C++
+  //             ├─────────────────────┤
+  //             │ Runtime_Foo         │  C++
+  //             ├─────────────────────┤
+  //             │ SomeV8CppFunction   │  C++
+  //             ├─────────────────────┤
+  //             │ ExitFrame           │  ← c_entry_fp
+  //             ├─────────────────────┤
+  //             │ JS frame            │
+  //             ├─────────────────────┤
+  //             │ JS frame            │
+  //             ├─────────────────────┤
+  //             │ EntryFrame          │
+  //             ├─────────────────────┤
+  //             │ embedder C++        │  C++
+  //             └─────────────────────┘
+  // 那么通过 StackFrameIterator，V8 只会扫描 ExitFrame、EntryFrame
+  // 以及所有 JS frame。
   for (StackFrameIterator it(this, thread); !it.done(); it.Advance()) {
     it.frame()->Iterate(v);
   }
