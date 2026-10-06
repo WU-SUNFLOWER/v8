@@ -230,6 +230,8 @@ class NewSpaceVisitor : public ConcurrentHeapVisitor<int, ConcreteVisitor> {
   void VisitMapPointer(Tagged<HeapObject>) override { UNREACHABLE(); }
 
  protected:
+  // V8中Map对象只能在老年代中被分配，不可能出现在新生代中（见AllocationType枚举）。
+  // 因此在扫描新生代时，不需要考虑扫描Map对象。
   V8_INLINE static constexpr bool ShouldVisitMapPointer() { return false; }
 
   // Special cases: Unreachable visitors for objects that are never found in the

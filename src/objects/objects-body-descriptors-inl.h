@@ -218,6 +218,8 @@ class JSObject::BodyDescriptor final : public BodyDescriptorBase {
   template <typename ObjectVisitor>
   static inline void IterateBody(Tagged<Map> map, Tagged<HeapObject> obj,
                                  int object_size, ObjectVisitor* v) {
+    // 扫描JS对象头部持有的Map的逻辑不在这里，其入口详见
+    // src/heap/objects-visiting-inl.h中的VISIT宏。
     IterateJSObjectBodyImpl(map, obj, kStartOffset, object_size, v);
   }
 
