@@ -116,11 +116,14 @@ class IterateAndScavengePromotedObjectsVisitor final : public ObjectVisitor {
     scavenger_->PageMemoryFence(MaybeObject::FromObject(target));
 
     if (Heap::InFromPage(target)) {
+      // 先对目标对象做scavenge操作，和ScavengeVisitor::VisitHeapObjectImpl()的逻辑一致。
       SlotCallbackResult result = scavenger_->ScavengeObject(slot, target);
       bool success = (*slot).GetHeapObject(&target);
       USE(success);
       DCHECK(success);
 
+      // 如果目标对象被迁移后还在新生代空间，由于之前host已晋升至老生代空间，
+      // 因此出现了一条`old->new`引用，需要记录进记忆集。
       if (result == KEEP_SLOT) {
         SLOW_DCHECK(IsHeapObject(target));
         MemoryChunk* chunk = MemoryChunk::FromHeapObject(host);
