@@ -472,8 +472,23 @@ void ScavengerCollector::CollectGarbage() {
       TRACE_GC(heap_->tracer(),
                GCTracer::Scope::SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_PROCESS);
       GlobalHandlesWeakRootsUpdatingVisitor visitor;
+      // 处理 WEAK 性质的 v8::Global<T>、v8::Persistent<T>。
+      // 大致过程：
+      // C++ weak handle
+      //       │
+      //       ▼
+      //    young object in from-space
+      //       │
+      //       ├── 有 forwarding address（IsUnscavengedHeapObjectSlot() = true）
+      //       │       │
+      //       │       └── 对象活着，更新 handle → 新地址
+      //       │
+      //       └── 没有 forwarding address
+      //               │
+      //               └── 对象死了，清理/reset weak handle
       isolate_->global_handles()->ProcessWeakYoungObjects(
           &visitor, &IsUnscavengedHeapObjectSlot);
+      // 处理 v8::TracedReference<T>。
       isolate_->traced_handles()->ProcessYoungObjects(
           &visitor, &IsUnscavengedHeapObjectSlot);
     }
@@ -522,6 +537,8 @@ void ScavengerCollector::CollectGarbage() {
     }
   }
 
+  // 解 Ephemeron 困境
+  // 参考：docs/ephemeron-dilemma-in-js-vm.md
   ProcessWeakReferences(&ephemeron_table_list);
 
   // Need to free new space LAB that was allocated during scavenge.
@@ -632,12 +649,15 @@ void ScavengerCollector::HandleSurvivingNewLargeObjects() {
   const bool is_compacting = heap_->incremental_marking()->IsCompacting();
   MarkingState* marking_state = heap_->marking_state();
 
+  // 遍历所有幸存大对象
   for (SurvivingNewLargeObjectMapEntry update_info :
        surviving_new_large_objects_) {
     Tagged<HeapObject> object = update_info.first;
     Tagged<Map> map = update_info.second;
     // Order is important here. We have to re-install the map to have access
     // to meta-data like size during page promotion.
+    // 在之前的scavenger扫描阶段（见Scavenger::HandleLargeObject()），
+    // 大对象的MapWord已经被设置为了forwarding pointer。这里要再恢复回来。
     object->set_map_word(map, kRelaxedStore);
 
     if (is_compacting && marking_state->IsMarked(object) &&
@@ -645,6 +665,11 @@ void ScavengerCollector::HandleSurvivingNewLargeObjects() {
       RememberedSet<OLD_TO_OLD>::Insert<AccessMode::ATOMIC>(
           MemoryChunk::FromHeapObject(object), object->map_slot().address());
     }
+
+    // 将幸存大对象所在的page，整体晋升到old large object space。
+    // 整个过程不发生针对page或堆上对象的内存拷贝，只是更新page中
+    // 的相关字段，并将它挂到ol space的名下。
+    // 这里也可以理解为V8为了优先保证scavenge gc处理速度的trade off。
     LargePage* page = LargePage::FromHeapObject(object);
     heap_->lo_space()->PromoteNewLargeObject(page);
   }
@@ -985,6 +1010,9 @@ void RootScavengeVisitor::ScavengePointer(FullObjectSlot p) {
   Tagged<Object> object = *p;
   DCHECK(!HasWeakHeapObjectTag(object));
   DCHECK(!MapWord::IsPacked(object.ptr()));
+  // 理论上这里也可以用Heap::InFromPage(object)来判断，但V8作者可能是故意这么写的：
+  // 意在结合Scavenger::ScavengeObject()中的断言交叉验证，GC过程中扫描新生代所发现
+  // 的live object一定位于from space当中。
   if (Heap::InYoungGeneration(object)) {
     scavenger_->ScavengeObject(FullHeapObjectSlot(p), HeapObject::cast(object));
   }

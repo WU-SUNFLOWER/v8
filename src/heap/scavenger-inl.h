@@ -190,6 +190,7 @@ CopyAndForwardResult Scavenger::PromoteObject(Tagged<Map> map,
 
   Tagged<HeapObject> target;
   if (allocation.To(&target)) {
+    // 这块的逻辑和Scavenger::SemiSpaceCopyObject()高度相似，不再一一展开分析。
     DCHECK(heap()->non_atomic_marking_state()->IsUnmarked(target));
     const bool self_success =
         MigrateObject(map, object, target, object_size, promotion_heap_choice);
@@ -214,6 +215,8 @@ CopyAndForwardResult Scavenger::PromoteObject(Tagged<Map> map,
 
     // During incremental marking we want to push every object in order to
     // record slots for map words. Necessary for map space compaction.
+    // 从新生代被晋升到老生代的对象，其内部还有对其他对象的引用需要扫描，
+    // 因此需要先保存到promotion_list_local_队列中，以便后续迭代处理。
     if (object_fields == ObjectFields::kMaybePointers || is_compacting_) {
       promotion_list_local_.PushRegularObject(target, object_size);
     }
@@ -234,14 +237,22 @@ bool Scavenger::HandleLargeObject(Tagged<Map> map, Tagged<HeapObject> object,
                                   int object_size, ObjectFields object_fields) {
   // TODO(hpayer): Make this check size based, i.e.
   // object_size > kMaxRegularHeapObjectSize
+  // 先看一下当前对象是不是位于new large object space当中。
+  // 如是，则说明为幸存大对象，需要在本函数中进一步处理。
   if (V8_UNLIKELY(
           BasicMemoryChunk::FromHeapObject(object)->InNewLargeObjectSpace())) {
     DCHECK_EQ(NEW_LO_SPACE,
               MemoryChunk::FromHeapObject(object)->owner_identity());
+    // 尽管在处理大对象时，V8不会真的执行搬迁拷贝操作，但仍然需要将对象头MapWord设置为一个
+    // forwarding pointer（指向对象自己的原位置）。
+    // 这样如果某个scavenger再次在对象图中扫描到该大对象时，就能够知道该对象已经被处理过了，从而避免重入。
     if (object->release_compare_and_swap_map_word_forwarded(
             MapWord::FromMap(map), object)) {
+      // 记录下幸存的大对象及其原map，后续在ScavengerCollector::HandleSurvivingNewLargeObjects()
+      // 当中晋升大对象时会用到。
       surviving_new_large_objects_.insert({object, map});
       promoted_size_ += object_size;
+      // 如果大对象内部可能有引用其他对象的指针，记录进promotion_list_local_，以便后续进一步扫描处理。
       if (object_fields == ObjectFields::kMaybePointers) {
         promotion_list_local_.PushLargeObject(object, map, object_size);
       }
@@ -431,6 +442,7 @@ SlotCallbackResult Scavenger::EvacuateObject(THeapObjectSlot slot,
       }
       V8_FALLTHROUGH;
     default:
+      // 这里要根据visitor_id先推测一下被evacuated的对象内部，是否还有对其他虚拟机堆上对象的引用
       return EvacuateObjectDefault(map, slot, source, size,
                                    Map::ObjectFieldsFrom(visitor_id));
   }
@@ -442,6 +454,7 @@ SlotCallbackResult Scavenger::ScavengeObject(THeapObjectSlot p,
   static_assert(std::is_same<THeapObjectSlot, FullHeapObjectSlot>::value ||
                     std::is_same<THeapObjectSlot, HeapObjectSlot>::value,
                 "Only FullHeapObjectSlot and HeapObjectSlot are expected here");
+  // 上游调用方需要自行保证object来自from space
   DCHECK(Heap::InFromPage(object));
 
   // Synchronized load that consumes the publishing CAS of MigrateObject. We
