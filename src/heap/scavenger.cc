@@ -846,6 +846,20 @@ void Scavenger::Process(JobDelegate* delegate) {
   do {
     done = true;
     ObjectAndSize object_and_size;
+
+    // V8并没有为scavenge gc实现一个统一的worklist，
+    // 而是拆成了copied_list_local_和promotion_list_local_。
+    // 这可能出于以下原因：
+    // （1）promotion_list_local_的消费逻辑涉及到更新记忆集等额外操作，
+    //      比一般的copied_list_local_更复杂，不适合耦合在一起。
+    // （2）消费copied_list_local_中幸存的新生代对象，是scavenge gc过程
+    //      中最热的高频操作，需要集中进行执行、以保持比较好的程序局部性。
+    //      区分worklist后，可以很自然地按不同的优先级来调度处理二者。
+
+    // `ShouldEagerlyProcessPromotionList`这个函数命名不太对，其真实语义
+    // 应该是`ShouldDeferPromotionList`，表示promotion_list_local_的长度
+    // 在阈值范围内时，优先集中消费copied_list_local_中的元素，先不急着消费
+    // promotion_list_local_。
     while (promotion_list_local_.ShouldEagerlyProcessPromotionList() &&
            copied_list_local_.Pop(&object_and_size)) {
       scavenge_visitor.Visit(object_and_size.first);
