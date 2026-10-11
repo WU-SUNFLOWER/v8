@@ -373,6 +373,8 @@ class V8_EXPORT_PRIVATE LocalHeap {
 
   GCCallbacksInSafepoint gc_epilogue_callbacks_;
 
+  // 后台线程创建的堆上对象，一般生命周期都比较长、或者体积比较大，
+  // 因此V8选择直接不开放新生代空间的并发访问给后台线程。
   std::unique_ptr<ConcurrentAllocator> old_space_allocator_;
   std::unique_ptr<ConcurrentAllocator> code_space_allocator_;
   std::unique_ptr<ConcurrentAllocator> shared_old_space_allocator_;

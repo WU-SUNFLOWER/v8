@@ -72,9 +72,12 @@ Tagged<FreeSpace> FreeListCategory::SearchForNodeInList(size_t minimum_size,
 
 void FreeListCategory::Free(Address start, size_t size_in_bytes, FreeMode mode,
                             FreeList* owner) {
+  // 将待释放的区域当作一个FreeSpace对象（空闲链表节点）来解读
   Tagged<FreeSpace> free_space =
       FreeSpace::cast(HeapObject::FromAddress(start));
+  // 上层代码在释放该区域之前，首先需要保证已经将该区域当成一个FreeSpace对象，并提前写入其size字段
   DCHECK_EQ(free_space->Size(), size_in_bytes);
+  // 采用头插法，将当前FreeSpace对象真正地插到空闲链表的头部，完成内存回收
   {
     CodePageMemoryModificationScope memory_modification_scope(
         BasicMemoryChunk::FromAddress(start));
@@ -288,6 +291,12 @@ size_t FreeListManyCached::Free(Address start, size_t size_in_bytes,
   page->DecreaseAllocatedBytes(size_in_bytes);
 
   // Blocks have to be a minimum size to hold free list items.
+  // 如果上层代码要释放的块大小，小于min_block_size_阈值（其值等于
+  // kMinBlockSize = 3 * kTaggedSize），那么鉴于：
+  // （1）这个块可能放不下将其挂入空闲链表所需的map、size和next数据。
+  //        - 见src/objects/free-space.tq
+  // （2）块太小了，回收进空闲链表、下次还会被用到的可能性不大。
+  // V8会直接将其记录为wasted memory，而不实际回收。
   if (size_in_bytes < min_block_size_) {
     page->add_wasted_memory(size_in_bytes);
     return size_in_bytes;
@@ -295,11 +304,14 @@ size_t FreeListManyCached::Free(Address start, size_t size_in_bytes,
 
   // Insert other blocks at the head of a free list of the appropriate
   // magnitude.
+  // 根据要释放的块大小，从start地址所在page全体
+  // free list中挑选一个合适的，将这个块存进其中。
   FreeListCategoryType type = SelectFreeListCategoryType(size_in_bytes);
   page->free_list_category(type)->Free(start, size_in_bytes, mode, this);
 
   // Updating cache
   if (mode == kLinkCategory) {
+    // 更新缓存，表明type对应的空闲链表目前有可用的空闲块
     UpdateCacheAfterAddition(type);
 
 #ifdef DEBUG

@@ -24,6 +24,7 @@ void HeapAllocator::Setup(LinearAllocationArea& new_allocation_info,
     spaces_[i] = heap_->space(i);
   }
 
+  // 为每个堆空间初始化专属的内存主分配器
   if (heap_->new_space()) {
     new_space_allocator_.emplace(heap_, heap_->new_space(),
                                  new_allocation_info);

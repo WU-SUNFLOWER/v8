@@ -3290,10 +3290,15 @@ void CreateFillerObjectAtImpl(Heap* heap, Address addr, int size,
     // Ensure the filler map is properly initialized.
     DCHECK(IsMap(filler->map(heap->isolate())));
   } else {
+    // 如果要准备释放的堆上区域大小比2 * kTaggedSize大，就将其当作一个
+    // FreeSpace对象来对待，便于后续被回收回堆内存页的空闲链表。
     DCHECK_GT(size, 2 * kTaggedSize);
+    // 填写对象的map字段为FreeSpace的Map
     filler->set_map_after_allocation(roots.unchecked_free_space_map(),
                                      SKIP_WRITE_BARRIER);
+    // 填写FreeSpace的size字段
     FreeSpace::cast(filler)->set_size(size, kRelaxedStore);
+    // 将该区域的后续部分填充为占位符
     if (clear_memory_mode == ClearFreedMemoryMode::kClearFreedMemory) {
       MemsetTagged(ObjectSlot(addr) + 2,
                    Tagged<Object>(kClearedFreeMemoryValue),
@@ -3655,6 +3660,7 @@ void Heap::MakeLinearAllocationAreasIterable() {
 void Heap::FreeLinearAllocationAreas() {
   FreeMainThreadLinearAllocationAreas();
 
+  // 遍历虚拟机中所有创建出来的LocalHeap，将这些LocalHeap申请的LAB中还没使用的部分回收回来
   safepoint()->IterateLocalHeaps(
       [](LocalHeap* local_heap) { local_heap->FreeLinearAllocationAreas(); });
 

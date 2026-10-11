@@ -302,6 +302,7 @@ void MainAllocator::FreeLinearAllocationArea() {
 #endif  // DEBUG
 
   BasicMemoryChunk::UpdateHighWaterMark(top());
+  // 将释放操作转发给allocator policy处理
   allocator_policy_->FreeLinearAllocationArea();
 }
 
@@ -433,8 +434,10 @@ void SemiSpaceNewSpaceAllocatorPolicy::FreeLinearAllocationArea() {
   Address current_limit = allocator_->limit();
 
   allocator_->AdvanceAllocationObservers();
+  // 清空堆空间分配器内部的分配状态
   allocator_->ResetLab(kNullAddress, kNullAddress, kNullAddress);
 
+  // 把[current_top, current_limit)这段没有使用掉的内存区域，实际归还给堆空间
   space_->Free(current_top, current_limit);
 }
 
@@ -841,12 +844,15 @@ void PagedSpaceAllocatorPolicy::FreeLinearAllocationAreaUnsynchronized() {
         ->DestroyBlackArea(current_top, current_limit);
   }
 
+  // 清空堆空间分配器内部的分配状态
   allocator_->ResetLab(kNullAddress, kNullAddress, kNullAddress);
   DCHECK_GE(current_limit, current_top);
 
   DCHECK_IMPLIES(current_limit - current_top >= 2 * kTaggedSize,
                  heap()->marking_state()->IsUnmarked(
                      HeapObject::FromAddress(current_top)));
+
+  // 把[current_top,current_max_limit)这段没有使用掉的内存区域，实际归还给堆空间
   space_->Free(current_top, current_max_limit - current_top,
                SpaceAccountingMode::kSpaceAccounted);
 }

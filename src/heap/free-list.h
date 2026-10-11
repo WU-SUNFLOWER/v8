@@ -42,6 +42,7 @@ enum FreeMode { kLinkCategory, kDoNotLinkCategory };
 enum class SpaceAccountingMode { kSpaceAccounted, kSpaceUnaccounted };
 
 // A free list category maintains a linked list of free memory blocks.
+// 一个FreeListCategory实例对象代表一个真正的空闲链表，它内部持有指向空闲链表头节点的指针（top_）
 class FreeListCategory {
  public:
   void Initialize(FreeListCategoryType type) {
@@ -129,6 +130,8 @@ class FreeListCategory {
 // find a new space to allocate from. This is done with the free list, which is
 // divided up into rough categories to cut down on waste. Having finer
 // categories would scatter allocation more.
+// FreeList实际上并非代表"单个空闲链表"，它会持有一系列负责承载不同块大小
+// 的实际空闲链表（FreeListCategory），见它的categories_属性。
 class FreeList {
  public:
   // Creates a Freelist of the default class.

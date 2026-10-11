@@ -831,8 +831,31 @@ base::Optional<std::pair<Address, Address>> SemiSpaceNewSpace::Allocate(
 
 void SemiSpaceNewSpace::Free(Address start, Address end) {
   DCHECK_LE(start, end);
+  // 在区间[start, end)填充一个临时的filler对象（dummy对象），
+  // 避免被GC扫描时出现异常。
   heap()->CreateFillerObjectAt(start, static_cast<int>(end - start));
 
+  // 【情况一】
+  // 要释放区间的end恰好是堆空间的allocation_top_，即end的右侧区域均没有分配出去：
+  // +-------------------+---------------+--------------+
+  // | allocated area... | filler object | free area... |
+  // +-------------------+---------------+--------------+
+  //                     ↑               ↑
+  //                   start    end/allocation_top_
+  // 这种情况下可以直接将[start,end)区间回收回堆空间（即直接让allocation_top_指向start）
+  // +-------------------+------------------------------+
+  // | allocated area... |          free area...        |
+  // +-------------------+------------------------------+
+  //                     ↑
+  //              allocation_top_
+  // 【情况二】
+  // 要释放区间的end不等于堆空间的allocation_top_，即end的右侧区域可能已被分配出去：
+  // +-------------------+---------------+-------------------+--------------+
+  // | allocated area... | filler object | allocated area... | free area... |
+  // +-------------------+---------------+-------------------+--------------+
+  //                     ↑               ↑                   ↑
+  //                   start            end           allocation_top_
+  // 这种情况下，无法调整allocation_top_；区间[start,end)无法被回收回堆空间，还需要作为碎片存在一段时间。
   if (end == allocation_top()) {
     DecrementAllocationTop(start);
   }

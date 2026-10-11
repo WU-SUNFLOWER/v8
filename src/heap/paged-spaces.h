@@ -367,6 +367,7 @@ class V8_EXPORT_PRIVATE PagedSpaceBase
   AllocationStats accounting_stats_;
 
   // Mutex guarding any concurrent access to the space.
+  // 现代V8中堆空间可能会被后台线程并发访问，因此需要锁保护
   mutable base::Mutex space_mutex_;
 
   std::atomic<size_t> committed_physical_memory_{0};
