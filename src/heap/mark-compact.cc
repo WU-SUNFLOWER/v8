@@ -320,6 +320,9 @@ static void TraceFragmentation(PagedSpace* space) {
          static_cast<double>(free) * 100 / reserved);
 }
 
+// 决策本次 GC 是否允许执行内存压缩（Compaction）；
+// 并从不同的堆空间中挑选需要整理的内存页（Evacuation Candidates），
+// 放进evacuation_candidates_列表中。
 bool MarkCompactCollector::StartCompaction(StartCompactionMode mode) {
   DCHECK(!compacting_);
   DCHECK(evacuation_candidates_.empty());
@@ -517,6 +520,7 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
          space->identity() == TRUSTED_SPACE);
 
   int number_of_pages = space->CountTotalPages();
+  // space空间中单张内存页初始可分配内存的总大小（页面总大小-页头大小）
   size_t area_size = space->AreaSize();
 
   const bool in_standard_path =
@@ -535,8 +539,23 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
     //   between live bytes and capacity of this page (= area).
     // * Evacuation quota: A global quota determining how much bytes should be
     //   compacted.
+    //
+    // V8会依据一定的算法，生成target_fragmentation_percent和max_evacuated_bytes
+    // 两个参数，用于衡量某个内存页是否需要被压缩处理：
+    // * target_fragmentation_percent（碎片率）：如果某个内存页的碎片率过高，那
+    //   么对它进行compact，我们更容易收获大段连续的、可供分配的内存。反过来说，如
+    //   果一个内存页中的内存基本都被分配出去了，碎片率很低，那么compact它能够榨取
+    //   到的可用内存就非常少，对它做compact的价值也就不大了。
+    // * max_evacuated_bytes（疏散配额）：对内存页进行compact是一个非常昂贵的操作，
+    //   涉及到大量字节的拷贝/evacuate操作。为了控制compact的成本，V8需要对compact
+    //   过程中执行拷贝/evacuate操作的字节总量进行限制。
     ComputeEvacuationHeuristics(area_size, &target_fragmentation_percent,
                                 &max_evacuated_bytes);
+    // 这里需要澄清一个疑问：为什么可以把内存页的待分配内存大小（free_bytes）当作碎片
+    // 大小来使用？
+    // 原因在于，当MarkCompactGC触发时，说明V8堆内存已经比较紧张了，可以近似认为各个
+    // 内存页中可分配的有效空闲内存已趋近于0。在这个前提下，可以近似认为内存页中未分配
+    // 出去的字节大小，就是内存页中的碎片大小。
     free_bytes_threshold = target_fragmentation_percent * (area_size / 100);
   }
 
@@ -571,6 +590,8 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
     if (in_standard_path) {
       // Only the pages with at more than |free_bytes_threshold| free bytes are
       // considered for evacuation.
+      // 如果当前内存页的（近似）碎片大小已超出阈值，那么将它记录下来，作为考虑最终执行
+      // compact处理的候选页。
       if (area_size - p->allocated_bytes() >= free_bytes_threshold) {
         pages.push_back(std::make_pair(p->allocated_bytes(), p));
       }
@@ -620,6 +641,13 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
     // - the total size of evacuated objects does not exceed the specified
     // limit.
     // - fragmentation of (n+1)-th page does not exceed the specified limit.
+    //
+    // 对之前筛选出来的候选页列表pages进行后处理，确定最终参与compact的页面：
+    // （1）对pages列表进行排序。候选页已分配出去的内存越少，说明经过compact
+    //      处理之后，能得到的大块空闲内存越多，就排在越前面。
+    // （2）从排序后的pages中，取前candidate_count个页面，使得处理它们所需
+    //      拷贝/evacuate的字节总数不会超出max_evacuated_bytes（疏散配额）
+    //      阈值。
     std::sort(pages.begin(), pages.end(),
               [](const LiveBytesPagePair& a, const LiveBytesPagePair& b) {
                 return a.first < b.first;
@@ -645,6 +673,10 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
     }
     // How many pages we will allocated for the evacuated objects
     // in the worst case: ceil(total_live_bytes / area_size)
+    // 最后我们来估算一下，假设对筛选出来的这些内存页做compact，最后能
+    // 得到的空内存页有多少个（estimated_released_pages）？
+    // 如果estimated_released_pages为0，说明经过compact之后可能得不
+    // 到任何空内存页，ROI不是很划算，就直接放弃本轮compact操作算了。
     int estimated_new_pages =
         static_cast<int>((total_live_bytes + area_size - 1) / area_size);
     DCHECK_LE(estimated_new_pages, candidate_count);
@@ -653,6 +685,9 @@ void MarkCompactCollector::CollectEvacuationCandidates(PagedSpace* space) {
     if ((estimated_released_pages == 0) && !v8_flags.compact_on_every_full_gc) {
       candidate_count = 0;
     }
+    // 如果本轮compact操作的ROI还是划算的，就将最终筛选出来的candidate_count
+    // 个内存页全部提交到MarkCompactCollector::evacuation_candidates_列表，
+    // 为后面实际执行MarkCompact GC做好准备。
     for (int i = 0; i < candidate_count; i++) {
       AddEvacuationCandidate(pages[i].second);
     }
