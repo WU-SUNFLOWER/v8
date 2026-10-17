@@ -133,6 +133,9 @@ class V8_EXPORT_PRIVATE MarkingBitmap final {
   }
 
   V8_INLINE static constexpr CellType IndexInCellMask(MarkBitIndex index) {
+    // 一个cell的大小为8字节（64bit），因此一个cell中可以存储64个TaggedSize
+    // 槽位的标记位。求index % 64（即index & kBitIndexMask），就可以得到index
+    // 在其对应的cell中，位居第几个标记位。之后即可构造相应的标记位mask。
     return static_cast<CellType>(1u) << IndexInCell(index);
   }
 

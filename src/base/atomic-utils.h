@@ -168,10 +168,16 @@ class AsAtomicImpl {
     T old_value = Relaxed_Load(addr);
     T new_value, old_value_before_cas;
     do {
+      // 如果bits已经被某个线程成功标记上去了，直接返回false
       if ((old_value & mask) == bits) return false;
       new_value = (old_value & ~mask) | bits;
       old_value_before_cas = old_value;
       old_value = Release_CompareAndSwap(addr, old_value, new_value);
+      // 如果old_value == old_value_before_cas，说明当前bits
+      // 已经被成功标记到addr这个内存位置上去了，接下来退出循环
+      // 并返回true即可。
+      // 否则说明在尝试标记前，addr位置的数据被其他线程动过了，
+      // 因此需要循环重试。
     } while (old_value != old_value_before_cas);
     return true;
   }

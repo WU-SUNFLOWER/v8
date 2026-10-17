@@ -164,9 +164,7 @@ class MemoryChunk : public BasicMemoryChunk {
   // Approximate amount of physical memory committed for this chunk.
   V8_EXPORT_PRIVATE size_t CommittedPhysicalMemory() const;
 
-  class ProgressBar& ProgressBar() {
-    return progress_bar_;
-  }
+  class ProgressBar& ProgressBar() { return progress_bar_; }
   const class ProgressBar& ProgressBar() const { return progress_bar_; }
 
   inline void IncrementExternalBackingStoreBytes(ExternalBackingStoreType type,
@@ -342,6 +340,8 @@ class MemoryChunk : public BasicMemoryChunk {
   // counter is reset to 0 whenever the page is empty.
   size_t age_in_new_space_ = 0;
 
+  // 用于存放GC时当前页面中对象标记位的位图
+  // （V8中对象的标记位是放在page的位图里集中管理的，而不是放在对象头里的）
   MarkingBitmap marking_bitmap_;
 
  private:

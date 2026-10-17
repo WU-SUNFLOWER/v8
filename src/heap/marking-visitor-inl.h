@@ -38,6 +38,10 @@ void MarkingVisitorBase<ConcreteVisitor>::MarkObject(
   DCHECK(ReadOnlyHeap::Contains(object) || heap_->Contains(object));
   SynchronizePageAccess(object);
   concrete_visitor()->AddStrongReferenceForReferenceSummarizer(host, object);
+  // 尝试对目标object进行标记（内部是一个CAS+while逻辑）
+  //   - 标记成功：TryMark()返回true，将object丢进worklist。
+  //   - 标记失败：object先前已被（自己或其他线程）标记过了，
+  //     TryMark()返回false，不用再进一步处理了。
   if (concrete_visitor()->TryMark(object)) {
     local_marking_worklists_->Push(object);
     if (V8_UNLIKELY(concrete_visitor()->retaining_path_mode() ==

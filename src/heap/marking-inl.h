@@ -155,8 +155,17 @@ MarkingBitmap* MarkingBitmap::FromAddress(Address address) {
 
 // static
 MarkBit MarkingBitmap::MarkBitFromAddress(Address address) {
+  // index：当前地址对应于页面中的第几个TaggedSize槽位（从0计数）？
   const auto index = AddressToIndex(address);
+  //
   const auto mask = IndexInCellMask(index);
+  // FromAddress(address)->cells()：对应页面MarkingBitmap的首地址
+  // IndexToCell(index)：index对应于MarkingBitmap（本质是个CellType[]定长数组）中的cell下标
+  //   - 因为bitmap中一个bit位对应于一个TaggedSize槽位，一个cell的大小
+  //     为8字节（64bit），所以IndexToCell(index) = index / 64，即
+  //     index >> kBitsPerCellLog2。
+  // 两者相加，即&((FromAddress(address)->cells())[IndexToCell(index)])，得到address在
+  // MarkingBitmap当作对应cell的地址。
   MarkBit::CellType* cell = FromAddress(address)->cells() + IndexToCell(index);
   return MarkBit(cell, mask);
 }
