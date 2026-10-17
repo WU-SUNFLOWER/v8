@@ -307,6 +307,8 @@ void MarkCompactCollector::AddEvacuationCandidate(Page* p) {
         p->area_size() - p->allocated_bytes(), p->ComputeFreeListsLength());
   }
 
+  // 给被选中参与compact处理的page，打上EVACUATION_CANDIDATE标签。
+  // 后面的业务代码可以通过IsEvacuationCandidate()方法判断某个页面是否被打上了该标签。
   p->MarkEvacuationCandidate();
   evacuation_candidates_.push_back(p);
 }
@@ -336,6 +338,7 @@ bool MarkCompactCollector::StartCompaction(StartCompactionMode mode) {
     return false;
   }
 
+  // 从老生代中筛选参与本轮compact处理的内存页
   CollectEvacuationCandidates(heap_->old_space());
 
   if (heap_->shared_space()) {
@@ -351,6 +354,10 @@ bool MarkCompactCollector::StartCompaction(StartCompactionMode mode) {
     TraceFragmentation(heap_->code_space());
   }
 
+  // 通过CollectEvacuationCandidates()筛选出来的待compact内存页，
+  // 都会被提交进evacuation_candidates_列表中。
+  // 如果evacuation_candidates_为空，说明没有合适的需要进行compact
+  // 处理的内存，因此本轮GC不需要做任何compact，将compacting_置为false。
   compacting_ = !evacuation_candidates_.empty();
   return compacting_;
 }
@@ -381,11 +388,14 @@ void MarkCompactCollector::StartMarking() {
   code_flush_mode_ = Heap::GetCodeFlushMode(heap_->isolate());
   marking_worklists_.CreateContextWorklists(contexts);
   auto* cpp_heap = CppHeap::From(heap_->cpp_heap_);
+  // V8主线程也要参与MarkCompact GC的标记工作，因此需要为主线程
+  // 创建一个专用的本地工作队列local_marking_worklists_。
   local_marking_worklists_ = std::make_unique<MarkingWorklists::Local>(
       &marking_worklists_,
       cpp_heap ? cpp_heap->CreateCppMarkingStateForMutatorThread()
                : MarkingWorklists::Local::kNoCppMarkingState);
   local_weak_objects_ = std::make_unique<WeakObjects::Local>(weak_objects());
+  // 主线程的marking visitor，就会用到这个本地工作队列local_marking_worklists_。
   marking_visitor_ = std::make_unique<MainMarkingVisitor>(
       local_marking_worklists_.get(), local_weak_objects_.get(), heap_, epoch(),
       code_flush_mode(), heap_->cpp_heap_,
@@ -410,6 +420,11 @@ void MarkCompactCollector::CollectGarbage() {
   // update the state as they proceed.
   DCHECK(state_ == PREPARE_GC);
 
+  // 即使之前已经做过增量标记了，在正式MarkCompactGC启动后，仍然需要从GCRoots出发
+  // 重新进行一次扫描，避免漏标。
+  // 当然，这不意味着需要将整个对象图全量遍历一遍，因为遍历过程中如果发现某个对象已经
+  // 被标记过了（已变黑），就不会将它再投入worklist了。
+  // 见MarkCompactCollector::MarkRootObject()、MarkingVisitorBase<ConcreteVisitor>::MarkObject()
   MarkLiveObjects();
   // This will walk dead object graphs and so requires that all references are
   // still intact.
@@ -716,6 +731,11 @@ void MarkCompactCollector::Prepare() {
 
   DCHECK_IMPLIES(heap_->incremental_marking()->IsMarking(),
                  heap_->incremental_marking()->IsMajorMarking());
+  // 如果之前已经启动了增量标记，就不需要重复启动标记了。因为本次MarkCompact GC
+  // 和之前的增量标记同属于同一次MarkCompactCollector标记周期（即之前的增量标记
+  // 是为这一次正式的MarkCompact GC分担掉一部分工作量）。
+  // 见IncrementalMarking::StartMarkingMajor()，可以看到其中已经调用过
+  // StartCompaction()和StartMarking()函数了。
   if (!heap_->incremental_marking()->IsMarking()) {
     StartCompaction(StartCompactionMode::kAtomic);
     StartMarking();
@@ -896,7 +916,9 @@ void MarkCompactCollector::SweepArrayBufferExtensions() {
 
 void MarkCompactCollector::MarkRootObject(Root root, Tagged<HeapObject> obj) {
   DCHECK(ReadOnlyHeap::Contains(obj) || heap_->Contains(obj));
+  // 尝试对obj进行标记
   if (marking_state_->TryMark(obj)) {
+    // 标记成功，obj从白色变为灰色，将其投入worklist
     local_marking_worklists_->Push(obj);
     if (V8_UNLIKELY(v8_flags.track_retaining_path)) {
       heap_->AddRetainingRoot(root, obj);
@@ -2233,6 +2255,7 @@ std::pair<size_t, size_t> MarkCompactCollector::ProcessMarkingWorklist(
         GarbageCollector::MARK_COMPACTOR, TaskPriority::kUserBlocking);
   }
 
+  // 从worklist中不停地取出灰色对象进行扫描
   while (local_marking_worklists_->Pop(&object) ||
          local_marking_worklists_->PopOnHold(&object)) {
     // The marking worklist should never contain filler objects.
@@ -2262,14 +2285,20 @@ std::pair<size_t, size_t> MarkCompactCollector::ProcessMarkingWorklist(
       native_context_stats_.IncrementSize(local_marking_worklists_->Context(),
                                           map, object, visited_size);
     }
+    // 统计整个循环过程中，已经处理的灰色对象的总大小
     bytes_processed += visited_size;
+    // 统计整个循环过程中，已经处理的灰色对象个数
     objects_processed++;
     static_assert(base::bits::IsPowerOfTwo(kDeadlineCheckInterval),
                   "kDeadlineCheckInterval must be power of 2");
+    // 如果整个循环的耗时已经超出了阈值，则提前结束标记扫描。
+    // 下面的两个`if(...) break`提前退出逻辑，是为了配合
+    // 增量标记"每次做掉一部分标记工作"的需求。
     if ((objects_processed & kDeadlineCheckInterval) == 0 &&
         ((v8::base::TimeTicks::Now() - start) > max_duration)) {
       break;
     }
+    // 如果整个循环中已处理的灰色对象总大小超出阈值，则提前结束标记扫描。
     if (bytes_processed >= max_bytes_to_process) {
       break;
     }
@@ -2456,6 +2485,10 @@ void MarkCompactCollector::MarkLiveObjects() {
         heap_->tracer(), GCTracer::Scope::MC_MARK_FINISH_INCREMENTAL,
         incremental_marking->current_trace_id(), TRACE_EVENT_FLAG_FLOW_IN);
     DCHECK(incremental_marking->IsMajorMarking());
+    // 注：因为增量标记是直接复用的MarkCompactCollector在主线程标记时使用
+    // 的local_marking_worklists_本地工作队列。因此在关闭增量标记时，无需
+    // 额外的工作队列publish/move/copy操作。本地工作队列中残留的灰色对象，
+    // 可在正式MarkCompactGC的标记阶段被处理！
     incremental_marking->Stop();
     MarkingBarrier::PublishAll(heap_);
   }
@@ -2496,6 +2529,7 @@ void MarkCompactCollector::MarkLiveObjects() {
     {
       TRACE_GC(heap_->tracer(),
                GCTracer::Scope::MC_MARK_FULL_CLOSURE_PARALLEL_JOIN);
+      // V8主线程会在此阻塞等待并行标记完成，然后再继续向下执行
       FinishConcurrentMarking();
     }
     parallel_marking_ = false;
@@ -2505,6 +2539,7 @@ void MarkCompactCollector::MarkLiveObjects() {
   }
 
   {
+    // 保守栈扫描
     TRACE_GC(heap_->tracer(), GCTracer::Scope::MC_MARK_ROOTS);
     MarkRootsFromConservativeStack(&root_visitor);
   }
@@ -2514,6 +2549,7 @@ void MarkCompactCollector::MarkLiveObjects() {
     // Complete the transitive closure single-threaded to avoid races with
     // multiple threads when processing weak maps and embedder heaps.
     CHECK(heap_->concurrent_marking()->IsStopped());
+    // 保守栈扫描之后可能又发现了一些存活对象，需要进行标记处理
     MarkTransitiveClosure();
     CHECK(local_marking_worklists_->IsEmpty());
     CHECK(
