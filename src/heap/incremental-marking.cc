@@ -129,6 +129,7 @@ void IncrementalMarking::Start(GarbageCollector garbage_collector,
                                GarbageCollectionReason gc_reason) {
   DCHECK(CanBeStarted());
   DCHECK(!heap_->sweeping_in_progress());
+  // 外部调用方需自行保证当前增量标记尚未被激活
   DCHECK(IsStopped());
 
   if (V8_UNLIKELY(v8_flags.trace_incremental_marking)) {
@@ -460,61 +461,60 @@ void IncrementalMarking::UpdateMarkingWorklistAfterScavenge() {
   major_collector_->local_marking_worklists()->Publish();
   MarkingBarrier::PublishAll(heap());
   PtrComprCageBase cage_base(isolate());
-  major_collector_->marking_worklists()->Update([this, marking_state, cage_base,
-                                                 filler_map](
-                                                    Tagged<HeapObject> obj,
-                                                    Tagged<HeapObject>* out)
-                                                    -> bool {
-    DCHECK(IsHeapObject(obj));
-    USE(marking_state);
+  major_collector_->marking_worklists()->Update(
+      [this, marking_state, cage_base, filler_map](
+          Tagged<HeapObject> obj, Tagged<HeapObject>* out) -> bool {
+        DCHECK(IsHeapObject(obj));
+        USE(marking_state);
 
-    // Only pointers to from space have to be updated.
-    if (Heap::InFromPage(obj)) {
-      MapWord map_word = obj->map_word(cage_base, kRelaxedLoad);
-      if (!map_word.IsForwardingAddress()) {
-        // There may be objects on the marking deque that do not exist
-        // anymore, e.g. left trimmed objects or objects from the root set
-        // (frames). If these object are dead at scavenging time, their
-        // marking deque entries will not point to forwarding addresses.
-        // Hence, we can discard them.
-        return false;
-      }
-      // Live young large objects are not relocated and directly promoted into
-      // the old generation before invoking this method. So they looke like any
-      // other pointer into the old space and we won't encounter them here in
-      // this code path.
-      DCHECK(!Heap::IsLargeObject(obj));
-      Tagged<HeapObject> dest = map_word.ToForwardingAddress(obj);
-      DCHECK_IMPLIES(marking_state->IsUnmarked(obj), IsFreeSpaceOrFiller(obj));
-      if (dest.InWritableSharedSpace() &&
-          !isolate()->is_shared_space_isolate()) {
-        // Object got promoted into the shared heap. Drop it from the client
-        // heap marking worklist.
-        return false;
-      }
-      // For any object not a DescriptorArray, transferring the object always
-      // increments live bytes as the marked state cannot distinguish fully
-      // processed from to-be-processed. Decrement the counter for such objects
-      // here.
-      if (!IsDescriptorArray(dest)) {
-        MemoryChunk::FromHeapObject(dest)->IncrementLiveBytesAtomically(
-            -ALIGN_TO_ALLOCATION_ALIGNMENT(dest->Size()));
-      }
-      *out = dest;
-      return true;
-    } else {
-      DCHECK(!Heap::InToPage(obj));
-      DCHECK_IMPLIES(marking_state->IsUnmarked(obj),
-                     IsFreeSpaceOrFiller(obj, cage_base));
-      // Skip one word filler objects that appear on the
-      // stack when we perform in place array shift.
-      if (obj->map(cage_base) != filler_map) {
-        *out = obj;
-        return true;
-      }
-      return false;
-    }
-  });
+        // Only pointers to from space have to be updated.
+        if (Heap::InFromPage(obj)) {
+          MapWord map_word = obj->map_word(cage_base, kRelaxedLoad);
+          if (!map_word.IsForwardingAddress()) {
+            // There may be objects on the marking deque that do not exist
+            // anymore, e.g. left trimmed objects or objects from the root set
+            // (frames). If these object are dead at scavenging time, their
+            // marking deque entries will not point to forwarding addresses.
+            // Hence, we can discard them.
+            return false;
+          }
+          // Live young large objects are not relocated and directly promoted
+          // into the old generation before invoking this method. So they looke
+          // like any other pointer into the old space and we won't encounter
+          // them here in this code path.
+          DCHECK(!Heap::IsLargeObject(obj));
+          Tagged<HeapObject> dest = map_word.ToForwardingAddress(obj);
+          DCHECK_IMPLIES(marking_state->IsUnmarked(obj),
+                         IsFreeSpaceOrFiller(obj));
+          if (dest.InWritableSharedSpace() &&
+              !isolate()->is_shared_space_isolate()) {
+            // Object got promoted into the shared heap. Drop it from the client
+            // heap marking worklist.
+            return false;
+          }
+          // For any object not a DescriptorArray, transferring the object
+          // always increments live bytes as the marked state cannot distinguish
+          // fully processed from to-be-processed. Decrement the counter for
+          // such objects here.
+          if (!IsDescriptorArray(dest)) {
+            MemoryChunk::FromHeapObject(dest)->IncrementLiveBytesAtomically(
+                -ALIGN_TO_ALLOCATION_ALIGNMENT(dest->Size()));
+          }
+          *out = dest;
+          return true;
+        } else {
+          DCHECK(!Heap::InToPage(obj));
+          DCHECK_IMPLIES(marking_state->IsUnmarked(obj),
+                         IsFreeSpaceOrFiller(obj, cage_base));
+          // Skip one word filler objects that appear on the
+          // stack when we perform in place array shift.
+          if (obj->map(cage_base) != filler_map) {
+            *out = obj;
+            return true;
+          }
+          return false;
+        }
+      });
 
   major_collector_->local_weak_objects()->Publish();
   weak_objects_->UpdateAfterScavenge();
