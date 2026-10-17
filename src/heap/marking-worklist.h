@@ -197,7 +197,13 @@ class V8_EXPORT_PRIVATE MarkingWorklists::Local final {
   Address SwitchToContextSlow(Address context);
 
   // Points to either `shared_`, `other_` or to a per-context worklist.
+  // active_：指向当前应该使用的具体本地工作队列。
   MarkingWorklist::Local* active_;
+  // shared_：默认使用的标记工作队列的本地视图。
+  //    - 在默认情况下，有`active_=&shared_`。
+  //      （见MarkingWorklists::Local的构造函数）
+  //    - 因此，初学时通常我们可以暂时把`local_marking_worklists->Push(obj)`
+  //      理解为`shared_.Push(obj)`
   MarkingWorklist::Local shared_;
   MarkingWorklist::Local on_hold_;
   Address active_context_;
