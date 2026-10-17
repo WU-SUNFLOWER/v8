@@ -1974,6 +1974,7 @@ void Heap::StartIncrementalMarking(GCFlags gc_flags,
                                    GarbageCollectionReason gc_reason,
                                    GCCallbackFlags gc_callback_flags,
                                    GarbageCollector collector) {
+  // 外部调用方需自行保证当前增量标记尚未启动
   DCHECK(incremental_marking()->IsStopped());
 
   // Delay incremental marking start while concurrent sweeping still has work.
