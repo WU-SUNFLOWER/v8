@@ -264,11 +264,16 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
   uint8_t task_id = delegate->GetTaskId() + 1;
   TaskState* task_state = task_state_[task_id].get();
   auto* cpp_heap = CppHeap::From(heap_->cpp_heap());
+  // ConcurrentMarking::RunMajor()运行在后台并发标记线程上，
+  // 需要创建和使用MarkingWorklists::Local对象来操作工作队列。
+  // marking_worklists_是之前在主线程ConcurrentMarking::TryScheduleJob()
+  // 中设置的全局主工作队列。
   MarkingWorklists::Local local_marking_worklists(
       marking_worklists_, cpp_heap
                               ? cpp_heap->CreateCppMarkingState()
                               : MarkingWorklists::Local::kNoCppMarkingState);
   WeakObjects::Local local_weak_objects(weak_objects_);
+  // 创建后台并发标记线程使用的visitor。它使用local_marking_worklists作为自己的本地工作队列。
   ConcurrentMarkingVisitor visitor(
       &local_marking_worklists, &local_weak_objects, heap_, mark_compact_epoch,
       code_flush_mode, heap_->cpp_heap(), should_keep_ages_unchanged,
@@ -303,6 +308,8 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
     CodePageHeaderModificationScope rwx_write_scope(
         "Marking a InstructionStream object requires write access to the "
         "Code page header");
+    // 消费处理local_marking_worklists中的灰色对象的主循环
+    // 正式MarkCompactGC时V8主线程的标记主循环，见MarkCompactCollector::ProcessMarkingWorklist()。
     while (!done) {
       size_t current_marked_bytes = 0;
       int objects_processed = 0;
