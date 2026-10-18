@@ -153,7 +153,13 @@ bool MarkingWorklists::Local::IsWrapperEmpty() const {
   return !cpp_marking_state_ || cpp_marking_state_->IsLocalEmpty();
 }
 
+// 这个函数只有可能在IncrementalMarking::Step()中一轮增量标记结束后被调用。
 void MarkingWorklists::Local::ShareWork() {
+  // 只有active_对应的全局工作队列为空，才会执行publish操作；
+  // 否则active_中的已标记灰色对象保持不动，等到下一轮增量标记
+  // 或者正式MarkCompactGC阶段再消费。
+  // 这个设计**可能**是为了减少对全局工作队列并发性的影响？因为
+  // 读写全局工作队列需要和后台并发标记线程竞争锁。
   if (!active_->IsLocalEmpty() && active_->IsGlobalEmpty()) {
     active_->Publish();
   }

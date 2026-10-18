@@ -319,6 +319,8 @@ void IncrementalMarking::StartMarkingMajor() {
   heap_->external_pointer_space()->StartCompactingIfNeeded();
 #endif  // V8_COMPRESS_POINTERS
 
+  // 增量标记阶段会直接复用MarkCompactCollector的marking_worklists_、
+  // local_marking_worklists_、marking_visitor_等基础设施。
   major_collector_->StartMarking();
   current_local_marking_worklists_ =
       major_collector_->local_marking_worklists();
@@ -326,6 +328,7 @@ void IncrementalMarking::StartMarkingMajor() {
   marking_mode_ = MarkingMode::kMajorMarking;
   heap_->SetIsMarkingFlag(true);
 
+  // 开启写屏障，避免增量标记过程中，向黑色对象新写入的引用被漏标
   MarkingBarrier::ActivateAll(heap(), is_compacting_);
   isolate()->traced_handles()->SetIsMarking(true);
 
@@ -336,6 +339,7 @@ void IncrementalMarking::StartMarkingMajor() {
     MarkRoots();
   }
 
+  // 启动后台并发标记
   if (v8_flags.concurrent_marking && !heap_->IsTearingDown()) {
     heap_->concurrent_marking()->TryScheduleJob(
         GarbageCollector::MARK_COMPACTOR);
@@ -860,6 +864,11 @@ void IncrementalMarking::Step(v8::base::TimeDelta max_duration,
   // This ignores that case where the embedder finds new V8-side objects. The
   // assumption is that large graphs are well connected and can mostly be
   // processed on their own. For small graphs, helping is not necessary.
+  //
+  // 增量标记的核心扫描操作，直接复用
+  // MarkCompactCollector::ProcessMarkingWorklist()，
+  // 只不过会对单次扫描的持续时间（max_duration）和扫描灰色
+  // 对象的字节总数（max_bytes_to_process）作出限制。
   std::tie(v8_bytes_processed, std::ignore) =
       major_collector_->ProcessMarkingWorklist(
           max_duration, max_bytes_to_process,
@@ -877,6 +886,8 @@ void IncrementalMarking::Step(v8::base::TimeDelta max_duration,
   }
 
   if (v8_flags.concurrent_marking) {
+    // 尝试把主线程独占的本地工作队列中剩余的灰色对象发布到全局工作队列，
+    // 以便并发标记线程可以继续在后台消费处理。
     local_marking_worklists()->ShareWork();
     heap_->concurrent_marking()->RescheduleJobIfNeeded(
         GarbageCollector::MARK_COMPACTOR);
