@@ -4,3 +4,5 @@ function demoStringOps(a, b) {
 }
 
 demoStringOps("Hello","World!");
+
+%DebugPrint(demoStringOps);

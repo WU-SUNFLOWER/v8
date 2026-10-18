@@ -1,4 +1,5 @@
 function foo() {
+  %DebugPrint("Hello World");
   const obj = {};
   obj.a = 1;
   obj.b = 2;

@@ -1,4 +1,5 @@
 %SetDebuggerBreakpointEnabled(false);
+%SetDebugPrintEnabled(false);
 
 function Animal(name) {
   this.name = name;
@@ -20,17 +21,19 @@ Dog.prototype.bark = function () {
 };
 
 function testDog(dog) {
-    %SetDebuggerBreakpointEnabled(true);
     dog.sayHello;
+    %SetDebuggerBreakpointEnabled(true);
+    %SetDebugPrintEnabled(true);
+    dog.bark;
     %SetDebuggerBreakpointEnabled(false);
-    //dog.bark();
+    %SetDebugPrintEnabled(false);
     return dog.name;
 };
 
 const dog1 = new Dog("Rex");
 const dog2 = new Dog("Denny");
 
-for (let i = 0; i < 100; ++i) {
+for (let i = 0; i < 11; ++i) {
     console.log(`i=${i}`);
     testDog(Math.random() < 0.5 ? dog1 : dog2);
 };
