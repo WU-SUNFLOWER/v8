@@ -222,13 +222,29 @@ void ScavengerCollector::JobTask::Run(JobDelegate* delegate) {
   }
 }
 
+// 向JobTask并发调度器告知目前scavenge gc工作的最大并发度，
+// 即为了完成gc工作，当前最多值得安排多少个线程同时执行
+// ScavengerCollector::JobTask::Run()/ScavengerCollector::JobTask::ProcessItems()？
+// 详细可参考：docs/the-basic-mental-model-of-v8-job-task-scheduling-mechanism.md
 size_t ScavengerCollector::JobTask::GetMaxConcurrency(
     size_t worker_count) const {
   // We need to account for local segments held by worker_count in addition to
   // GlobalPoolSize() of copied_list_ and promotion_list_.
+  //
+  // 根据ScavengerCollector::JobTask::ProcessItems()，当前版本的
+  // V8 scavenge gc分为两个阶段：
+  // （1）老生代page扫描阶段：
+  //      - 用remaining_memory_chunks_来评估当前的最大并发度
+  // （2）并发处理工作列表阶段：
+  //      - 用当前仍在工作的worker线程数（每个线程都被分配了本地的工作列表），
+  //        加上被发布到全局工作队列的Segment（并发gc处理单元）来评估当前的
+  //        最大并发度。
   size_t wanted_num_workers = std::max<size_t>(
       remaining_memory_chunks_.load(std::memory_order_relaxed),
       worker_count + copied_list_->Size() + promotion_list_->Size());
+  // 每个后台并发线程都有一个自己独占的Scavenger对象来执行GC任务，
+  // 因此最大并发度不能超过Scavenger实例的总数。
+  // 而如果V8没有开启后台线程能力，最大并发数的上限自然就是1啦~
   if (!outer_->heap_->ShouldUseBackgroundThreads()) {
     return std::min<size_t>(wanted_num_workers, 1);
   }
