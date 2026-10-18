@@ -731,11 +731,14 @@ void MarkCompactCollector::Prepare() {
 
   DCHECK_IMPLIES(heap_->incremental_marking()->IsMarking(),
                  heap_->incremental_marking()->IsMajorMarking());
-  // 如果之前已经启动了增量标记，就不需要重复启动标记了。因为本次MarkCompact GC
-  // 和之前的增量标记同属于同一次MarkCompactCollector标记周期（即之前的增量标记
-  // 是为这一次正式的MarkCompact GC分担掉一部分工作量）。
-  // 见IncrementalMarking::StartMarkingMajor()，可以看到其中已经调用过
-  // StartCompaction()和StartMarking()函数了。
+  // 如果之前已经启动了增量标记，就不需要重复启动标记了，
+  // 包括创建工作队列等前置准备工作。
+  // 因为本次MarkCompact GC和之前的增量标记同属于同一次
+  // MarkCompactCollector标记周期，即之前的增量标记是为
+  // 这一次正式的MarkCompactGC分担掉一部分工作量。
+  // 见IncrementalMarking::StartMarkingMajor()，可以
+  // 看到其中已经调用过StartCompaction()和StartMarking()
+  // 函数了。
   if (!heap_->incremental_marking()->IsMarking()) {
     StartCompaction(StartCompactionMode::kAtomic);
     StartMarking();
@@ -2506,6 +2509,15 @@ void MarkCompactCollector::MarkLiveObjects() {
   RootMarkingVisitor root_visitor(this);
 
   {
+    // 尽管增量标记启动时，已经扫描过GC Roots了，但在正式MarkCompactGC
+    // 阶段我们仍然走一下这个流程。
+    //    - 见IncrementalMarking::StartMarkingMajor()、
+    //      IncrementalMarking::MarkRoots()。
+    // 这是因为增量标记开始之后，JS主线程仍然在正常执行，这些GC Roots的
+    // 状态可能发生变化。
+    // 另外，增量标记启动时执行的GC Roots扫描，会主动跳过一些不能在那个
+    // 时刻按最终暂停方式处理的Roots（比如JS主线程堆栈，SkipRoot::kStack）。
+    // 这些Roots只能在最终MarkCompactGC阶段、JS主线程STW的情况下，才能扫描。
     TRACE_GC(heap_->tracer(), GCTracer::Scope::MC_MARK_ROOTS);
     MarkRoots(&root_visitor);
   }
@@ -2523,8 +2535,11 @@ void MarkCompactCollector::MarkLiveObjects() {
   if (v8_flags.parallel_marking && UseBackgroundThreadsInCycle()) {
     TRACE_GC(heap_->tracer(), GCTracer::Scope::MC_MARK_FULL_CLOSURE_PARALLEL);
     parallel_marking_ = true;
+    // 复用并发标记阶段的ConcurrentMarking，来配合V8主线程完成正式MarkCompactGC阶段的并行标记。
     heap_->concurrent_marking()->RescheduleJobIfNeeded(
         GarbageCollector::MARK_COMPACTOR, TaskPriority::kUserBlocking);
+    // 主线程自己在调度后台线程后，自己也投入标记工作当中去。
+    // 因此在正式MarkCompactGC阶段，主线程和后台线程同时推进标记工作，这就是所谓的"并行标记"。
     MarkTransitiveClosure();
     {
       TRACE_GC(heap_->tracer(),
@@ -2549,7 +2564,7 @@ void MarkCompactCollector::MarkLiveObjects() {
     // Complete the transitive closure single-threaded to avoid races with
     // multiple threads when processing weak maps and embedder heaps.
     CHECK(heap_->concurrent_marking()->IsStopped());
-    // 保守栈扫描之后可能又发现了一些存活对象，需要进行标记处理
+    // 保守栈扫描之后可能又发现了一些存活对象，需要在主线程上进行最终的标记处理
     MarkTransitiveClosure();
     CHECK(local_marking_worklists_->IsEmpty());
     CHECK(
