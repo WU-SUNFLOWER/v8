@@ -313,15 +313,21 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
     while (!done) {
       size_t current_marked_bytes = 0;
       int objects_processed = 0;
+      // 内循环在current_marked_bytes/objects_processed每达到一定阈值时就要结束，
+      // 因为外层循环中需要检查一下delegate->ShouldYield()是否为true（标记工作是否被delegate要求停止）
       while (current_marked_bytes < kBytesUntilInterruptCheck &&
              objects_processed < kObjectsUntilInterruptCheck) {
         Tagged<HeapObject> object;
+        // 从local worklist中取出灰色对象进行消费处理。
+        // 如果全局worklist已被清空，即local worklist也窃取不到
+        // 全局队列当中的灰色对象了，就结束当前线程的后台标记工作。
         if (!local_marking_worklists.Pop(&object)) {
           done = true;
           break;
         }
         DCHECK(!object.InReadOnlySpace());
         DCHECK_EQ(GetIsolateFromWritableObject(object), isolate);
+        // 统计已处理的灰色对象个数
         objects_processed++;
 
         Address new_space_top = kNullAddress;
@@ -342,6 +348,7 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
 
         if ((new_space_top <= addr && addr < new_space_limit) ||
             addr == new_large_object) {
+          // 对于扫描到的新生代对象，先放到on hold worklist当中，暂缓处理
           local_marking_worklists.PushOnHold(object);
         } else {
           Tagged<Map> map = object->map(cage_base, kAcquireLoad);
@@ -354,6 +361,7 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
               local_marking_worklists.SwitchToContext(context);
             }
           }
+          // 真正进入执行对灰色对象的扫描
           const auto visited_size = visitor.Visit(map, object);
           visitor.IncrementLiveBytesCached(
               MemoryChunk::cast(BasicMemoryChunk::FromHeapObject(object)),
@@ -362,6 +370,7 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
             native_context_stats.IncrementSize(
                 local_marking_worklists.Context(), map, object, visited_size);
           }
+          // 统计已扫描的灰色对象的总大小
           current_marked_bytes += visited_size;
         }
       }
@@ -369,6 +378,7 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
       marked_bytes += current_marked_bytes;
       base::AsAtomicWord::Relaxed_Store<size_t>(&task_state->marked_bytes,
                                                 marked_bytes);
+      // 被delegate要求让出CPU，就推出主循环，结束当前线程的当次后台并发标记工作
       if (delegate->ShouldYield()) {
         TRACE_GC_NOTE("ConcurrentMarking::RunMajor Preempted");
         break;
@@ -384,6 +394,7 @@ void ConcurrentMarking::RunMajor(JobDelegate* delegate,
       }
     }
 
+    // 当前后台线程的当前轮标记结束，将本地工作队列中的灰色对象，全部发布到全局工作队列
     local_marking_worklists.Publish();
     local_weak_objects.Publish();
     base::AsAtomicWord::Relaxed_Store<size_t>(&task_state->marked_bytes, 0);
@@ -590,6 +601,7 @@ void ConcurrentMarking::TryScheduleJob(GarbageCollector garbage_collector,
       }));
   garbage_collector_ = garbage_collector;
   if (garbage_collector == GarbageCollector::MARK_COMPACTOR) {
+    // 后台并发标记直接复用MarkCompactCollector的全局worklist
     marking_worklists_ = heap_->mark_compact_collector()->marking_worklists();
     auto job = std::make_unique<JobTaskMajor>(
         this, heap_->mark_compact_collector()->epoch(),

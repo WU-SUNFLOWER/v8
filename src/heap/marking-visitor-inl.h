@@ -96,6 +96,7 @@ V8_INLINE void MarkingVisitorBase<ConcreteVisitor>::VisitPointersImpl(
     Tagged<HeapObject> host, TSlot start, TSlot end) {
   using THeapObjectSlot = typename TSlot::THeapObjectSlot;
   for (TSlot slot = start; slot < end; ++slot) {
+    // 标记的过程可能是多线程并发的，因此在读取堆上对象的槽位时需要使用原子操作
     typename TSlot::TObject object =
         slot.Relaxed_Load(ObjectVisitorWithCageBases::cage_base());
     Tagged<HeapObject> heap_object;
