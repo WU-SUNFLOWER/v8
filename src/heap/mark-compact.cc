@@ -2493,6 +2493,9 @@ void MarkCompactCollector::MarkLiveObjects() {
     // 额外的工作队列publish/move/copy操作。本地工作队列中残留的灰色对象，
     // 可在正式MarkCompactGC的标记阶段被处理！
     incremental_marking->Stop();
+    // 之前通过各个线程上的MarkingBarrier写屏障发现并标记的灰色对象，
+    // 现在要全部发布到MarkCompactCollector的全局工作队列当中来，以
+    // 便在MarkLiveObjects全图标记阶段进行扫描消费。
     MarkingBarrier::PublishAll(heap_);
   }
 

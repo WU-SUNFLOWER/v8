@@ -413,6 +413,7 @@ void MarkingBarrier::DeactivateShared() {
 
 // static
 void MarkingBarrier::PublishAll(Heap* heap) {
+  // 将各个线程的写屏障的工作队列中的灰色对象发布出来
   heap->safepoint()->IterateLocalHeaps([](LocalHeap* local_heap) {
     local_heap->marking_barrier()->PublishIfNeeded();
   });
