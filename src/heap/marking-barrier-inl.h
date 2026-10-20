@@ -110,6 +110,11 @@ bool MarkingBarrier::IsCompacting(Tagged<HeapObject> object) const {
 }
 
 bool MarkingBarrier::WhiteToGreyAndPush(Tagged<HeapObject> obj) {
+  // 尝试给对象打标（最终会走到base::AsAtomicWord::SetBits()）。如果当前线程打标成功，
+  // 那么就将对象投入到当前线程的MarkingBarrier的本地工作队列中去。
+  // 没成功的原因包括但不限于：
+  //   - 该对象被其他线程的写屏障控制器抢先打标；
+  //   - 该对象已经被后台的并发扫描线程抢先打标。
   if (marking_state_.TryMark(obj)) {
     current_worklist_->Push(obj);
     return true;

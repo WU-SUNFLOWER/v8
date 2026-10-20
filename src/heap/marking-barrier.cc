@@ -42,11 +42,16 @@ MarkingBarrier::~MarkingBarrier() { DCHECK(typed_slots_map_.empty()); }
 void MarkingBarrier::Write(Tagged<HeapObject> host, HeapObjectSlot slot,
                            Tagged<HeapObject> value) {
   DCHECK(IsCurrentMarkingBarrier(host));
+  // 当前该线程上的写屏障控制器处于激活状态
   DCHECK(is_activated_ || shared_heap_worklist_.has_value());
+  // host页面得开启了MarkingBarrier写屏障
   DCHECK(MemoryChunk::FromHeapObject(host)->IsMarking());
 
+  // 尝试给对象打标
   MarkValue(host, value);
 
+  // 如果MarkCompact垃圾回收器已决定后面要做页面压缩，那么在
+  // 这里顺带记录槽位信息（主要服务于对象移动和引用更新）。
   if (slot.address() && IsCompacting(host)) {
     MarkCompactCollector::RecordSlot(host, slot, value);
   }
@@ -295,6 +300,13 @@ void DeactivateSpaces(Heap* heap, MarkingMode marking_mode) {
 
 // static
 void MarkingBarrier::ActivateAll(Heap* heap, bool is_compacting) {
+  // 为新老生代和其他空间开启Marking写屏障。
+  // 本质是给这些空间中的内存页打上flag（见MemoryChunk::SetOldGenerationPageFlags()）：
+  //    - POINTERS_TO_HERE_ARE_INTERESTING
+  //    - POINTERS_FROM_HERE_ARE_INTERESTING
+  //    - INCREMENTAL_MARKING
+  // 对被打上flag的页面，在上面发生写操作时，会触发V8进入Marking写屏障处理逻辑：
+  // 参见CombinedWriteBarrierInternal()
   ActivateSpaces(heap, MarkingMode::kMajorMarking);
 
   heap->safepoint()->IterateLocalHeaps([is_compacting](LocalHeap* local_heap) {
@@ -331,6 +343,8 @@ void MarkingBarrier::Activate(bool is_compacting, MarkingMode marking_mode) {
   DCHECK(!is_activated_);
   is_compacting_ = is_compacting;
   marking_mode_ = marking_mode;
+  // 创建一个本地工作队列，用于暂存被写屏障拦截的灰色对象。
+  // 在MajorGC阶段，这个本地工作队列就会与MarkCompactCollector的全局工作队列绑定。
   current_worklist_ = std::make_unique<MarkingWorklist::Local>(
       is_minor() ? *minor_collector_->marking_worklists()->shared()
                  : *major_collector_->marking_worklists()->shared());
