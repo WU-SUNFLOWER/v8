@@ -119,6 +119,8 @@ inline void CombinedWriteBarrierInternal(Tagged<HeapObject> host,
       !host_chunk->IsYoungOrSharedChunk();
   const bool is_marking = host_chunk->IsMarking();
 
+  // 如果host所在的内存页不在新生代，且value所在的
+  // 说明发生了old->new跨代引用，需要更新记忆集（remembered set）
   if (pointers_from_here_are_interesting &&
       value_chunk->IsYoungOrSharedChunk()) {
     // Generational or shared heap write barrier (old-to-new or old-to-shared).
@@ -126,6 +128,8 @@ inline void CombinedWriteBarrierInternal(Tagged<HeapObject> host,
   }
 
   // Marking barrier: mark value & record slots when marking is on.
+  // 如果host所在内存页被开启了MarkingBarrier写屏障，那么就进一步进行处理。
+  // 注意这个地方和很多理论教材不同：写屏障并没有检查宿主对象host本身的颜色是否为黑色！
   if (V8_UNLIKELY(is_marking)) {
     // CodePageHeaderModificationScope is not required because the only case
     // when a InstructionStream value is stored somewhere is during creation of
@@ -169,12 +173,16 @@ inline void WriteBarrierForCode(Tagged<InstructionStream> host,
 
 inline void CombinedWriteBarrier(Tagged<HeapObject> host, ObjectSlot slot,
                                  Tagged<Object> value, WriteBarrierMode mode) {
+  // 如果当前写屏障被显式关闭，那么什么也不用做
   if (mode == SKIP_WRITE_BARRIER) {
     SLOW_DCHECK(!WriteBarrier::IsRequired(host, value));
     return;
   }
 
+  // 如果value不是虚拟机堆上对象，那么什么也不用做
   if (!value.IsHeapObject()) return;
+
+  // 进一步分发写操作给匹配的写屏障处理逻辑
   heap_internals::CombinedWriteBarrierInternal(host, HeapObjectSlot(slot),
                                                HeapObject::cast(value), mode);
 }
@@ -333,6 +341,7 @@ void WriteBarrier::Marking(Tagged<HeapObject> host, MaybeObjectSlot slot,
 
 void WriteBarrier::Marking(Tagged<HeapObject> host, HeapObjectSlot slot,
                            Tagged<HeapObject> value) {
+  // 如果host所在内存页没开启MarkingBarrier写屏障，那么啥也不用做。
   if (!IsMarking(host)) return;
   MarkingSlow(host, slot, value);
 }

@@ -45,6 +45,7 @@ MarkingBarrier* WriteBarrier::SetForThread(MarkingBarrier* marking_barrier) {
 
 void WriteBarrier::MarkingSlow(Tagged<HeapObject> host, HeapObjectSlot slot,
                                Tagged<HeapObject> value) {
+  // 获取当前线程对应的MarkingBarrier写屏障控制实例
   MarkingBarrier* marking_barrier = CurrentMarkingBarrier(host);
   marking_barrier->Write(host, slot, value);
 }
@@ -101,6 +102,7 @@ void WriteBarrier::MarkingSlow(Tagged<HeapObject> host,
 int WriteBarrier::MarkingFromCode(Address raw_host, Address raw_slot) {
   Tagged<HeapObject> host = HeapObject::cast(Tagged<Object>(raw_host));
   MaybeObjectSlot slot(raw_slot);
+  // 从宿主对象的slot中取出被引用对象的地址
   Address value = (*slot).ptr();
 
 #ifdef V8_MAP_PACKING
