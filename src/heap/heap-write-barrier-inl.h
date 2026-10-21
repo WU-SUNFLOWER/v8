@@ -343,6 +343,18 @@ void WriteBarrier::Marking(Tagged<HeapObject> host, HeapObjectSlot slot,
                            Tagged<HeapObject> value) {
   // 如果host所在内存页没开启MarkingBarrier写屏障，那么啥也不用做。
   if (!IsMarking(host)) return;
+  // 尝试在当前线程中给value打上标记。
+  //
+  // 注意，V8在工程实现中**没有**使用经典的dijkstra写屏障——先检查
+  // host和value是否分别为黑色和白色，再进行标记。
+  //
+  // 这是因为这种通用的写屏障在并发式标记中存在内存可见性同步的困境。
+  // V8团队在权衡了处理这种困境的内存同步，和引入更大范围的 Floating Garbage
+  // 之间的代价之后，决定选择后者、在这里实现了更加保守的写屏障。
+  //
+  // 参见：
+  // - docs/gc/what-is-floating-garbage-in-incremental-marking-v8.md
+  // - docs/gc/why-v8-does-not-check-host-color-in-marking-barrier.md
   MarkingSlow(host, slot, value);
 }
 
