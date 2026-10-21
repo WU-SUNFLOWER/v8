@@ -413,7 +413,16 @@ void MarkingBarrier::DeactivateShared() {
 
 // static
 void MarkingBarrier::PublishAll(Heap* heap) {
-  // 将各个线程的写屏障的工作队列中的灰色对象发布出来
+  // 将各个线程的写屏障的工作队列中的灰色对象发布出来。
+  //
+  // 注意，V8会为主线程也创建一个LocalHeap实例，并挂到IsolateSafepoint的LocalHeap链表上。
+  // 因此这里遍历链表的时候，会把主线程MarkingBarrier的本地工作队列中的灰色对象也给发布出来，不会漏掉！
+  //
+  // 主线程 LocalHeap 实例的创建与添加到链表的调用链路：
+  // IsolateSafepoint::AddLocalHeap()
+  // LocalHeap::LocalHeap()
+  // LocalIsolate::LocalIsolate()
+  // Isolate::Init()
   heap->safepoint()->IterateLocalHeaps([](LocalHeap* local_heap) {
     local_heap->marking_barrier()->PublishIfNeeded();
   });
