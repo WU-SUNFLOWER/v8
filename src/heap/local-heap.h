@@ -221,6 +221,10 @@ class V8_EXPORT_PRIVATE LocalHeap {
   using SafepointRequestedBit = ParkedBit::Next<bool, 1>;
   using CollectionRequestedBit = SafepointRequestedBit::Next<bool, 1>;
 
+  // ThreadState内部包含三个位字段
+  // - ParkedBit：当前线程是否 Parked
+  // - SafepointRequestedBit：V8主线程是否请求当前线程到达 Safepoint
+  // - CollectionRequestedBit：是否存在请求主线程处理的 GC 请求
   class ThreadState final {
    public:
     static constexpr ThreadState Parked() {
@@ -274,6 +278,11 @@ class V8_EXPORT_PRIVATE LocalHeap {
     }
 
     bool CompareExchangeWeak(ThreadState& expected, ThreadState updated) {
+      // 比较并交换（允许伪失败）：
+      // - 如果raw_state_与expected相等，写入updated，并返回 true（成功）；
+      // - 如果raw_state_与expected不等，将raw_state_写回expected，并返回
+      //   false（失败）；
+      // - 允许在某些CPU架构上，即使raw_state_与expected相等，也可能产生失败。
       return raw_state_.compare_exchange_weak(expected.raw_state_,
                                               updated.raw());
     }
@@ -323,6 +332,9 @@ class V8_EXPORT_PRIVATE LocalHeap {
     DCHECK(AllowSafepoints::IsAllowed());
     DCHECK_IMPLIES(IsMainThreadOfClientIsolate(), is_in_trampoline());
     ThreadState expected = ThreadState::Running();
+    // 如果原先当前线程一直在正常运行状态（ThreadState中3个位字段均为0），
+    // 那么只需将其状态重新设置为(ParkedBit=1)即可。
+    // 如果原先当前线程已处于其他状态，那么进入慢速路径进一步处理。
     if (!state_.CompareExchangeWeak(expected, ThreadState::Parked())) {
       ParkSlowPath();
     }
