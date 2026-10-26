@@ -2335,6 +2335,9 @@ void Heap::PerformGarbageCollection(GarbageCollector collector,
 
   const base::TimeTicks atomic_pause_start_time = base::TimeTicks::Now();
 
+  // GC执行过程中，要确保所有后台线程都停在安全点。
+  // 单独编译出来的V8默认没有shared space，因此这里
+  // 会创建一个IsolateSafepointScope实例。
   base::Optional<SafepointScope> safepoint_scope;
   {
     AllowGarbageCollection allow_shared_gc;

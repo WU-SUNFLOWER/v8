@@ -43,7 +43,9 @@ void IsolateSafepoint::EnterLocalSafepointScope() {
   TRACE_GC(heap_->tracer(), GCTracer::Scope::TIME_TO_SAFEPOINT);
 
   barrier_.Arm();
+  // 统计并通知当前Isolate名下除了V8主线程之外的其他线程，要求它们进入安全点
   size_t running = SetSafepointRequestedFlags(IncludeMainThread::kNo);
+  // V8主线程在这里停住，等待所有后台线程均进入安全点
   barrier_.WaitUntilRunningThreadsInSafepoint(running);
 }
 
@@ -133,16 +135,22 @@ size_t IsolateSafepoint::SetSafepointRequestedFlags(
   // There needs to be at least one LocalHeap for the main thread.
   DCHECK_NOT_NULL(local_heaps_head_);
 
+  // 遍历当前Isolate名下全部线程的LocalHeap
   for (LocalHeap* local_heap = local_heaps_head_; local_heap;
        local_heap = local_heap->next_) {
+    // 默认忽略V8主线程
     if (local_heap->is_main_thread() &&
         include_main_thread == IncludeMainThread::kNo) {
       continue;
     }
 
+    // 原子地为后台线程的ThreadState设置SafepointRequested标记位，
+    // 向后台线程发送要求进入安全点的通知；同时拿到该后台线程旧的
+    // ThreadState状态。
     const LocalHeap::ThreadState old_state =
         local_heap->state_.SetSafepointRequested();
 
+    // 如果这个线程之前处于正常运行状态，一会儿V8主线程就要等待它进入安全点
     if (old_state.IsRunning()) running++;
     CHECK_IMPLIES(old_state.IsCollectionRequested(),
                   local_heap->is_main_thread());
@@ -226,6 +234,7 @@ void IsolateSafepoint::Barrier::Disarm() {
   cv_resume_.NotifyAll();
 }
 
+// V8 主线程等待全部后台线程进入安全点
 void IsolateSafepoint::Barrier::WaitUntilRunningThreadsInSafepoint(
     size_t running) {
   base::MutexGuard guard(&mutex_);
@@ -236,6 +245,7 @@ void IsolateSafepoint::Barrier::WaitUntilRunningThreadsInSafepoint(
   DCHECK_EQ(stopped_, running);
 }
 
+// V8 后台线程通过条件变量，通知 V8 主线程自己已进入安全点
 void IsolateSafepoint::Barrier::NotifyPark() {
   base::MutexGuard guard(&mutex_);
   CHECK(IsArmed());
@@ -287,6 +297,7 @@ Isolate* IsolateSafepoint::shared_space_isolate() const {
 
 IsolateSafepointScope::IsolateSafepointScope(Heap* heap)
     : safepoint_(heap->safepoint()) {
+  // safepoint_ 是挂在 Heap 名下的单例
   safepoint_->EnterLocalSafepointScope();
 }
 
