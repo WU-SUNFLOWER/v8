@@ -49,11 +49,19 @@ class V8_EXPORT_PRIVATE LocalHeap {
 
   // Frequently invoked by local thread to check whether safepoint was requested
   // from the main thread.
+  // 当线程可能需要长时间持续访问 V8 堆、执行循环或进行其他工作时，需要定期调用
+  // LocalHeap::Safepoint()，给 GC 一个暂停该线程的机会。
   void Safepoint() {
     DCHECK(AllowSafepoints::IsAllowed());
+    // 在绝大多数情况下，当前线程处于 running 状态，且未收到V8主线程
+    // 的SafepointRequested通知。
+    // 因此在绝大多数情况下，当前线程只需读取state_状态并进行位操作判断
+    // 即可，而不会进入下面的这个if块当中继续执行，非常轻量。
     ThreadState current = state_.load_relaxed();
 
     if (V8_UNLIKELY(current.IsRunningWithSlowPathFlag())) {
+      // 如果有收到SafepointRequested通知（可能是因为V8要执行GC了），
+      // 就进一步进行判断，必要时当前线程会通过条件变量挂起。
       SafepointSlowPath();
     }
   }
