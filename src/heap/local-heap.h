@@ -38,6 +38,15 @@ class Safepoint;
 //   Parked:  Heap access is not allowed, so the GC will not stop this thread
 //            for a collection. Useful when threads do not need heap access for
 //            some time or for blocking operations like locking a mutex.
+//   Running: 线程可以访问V8 Heap。但必须定期让GC有机会取得Safepoint，例如调用
+//            LocalHeap::Safepoint()。
+//   Parked: 线程不允许通过该LocalHeap访问堆。线程本身可能仍在执行其他工作或等待
+//            I/O、Mutex 等。
+//
+// 注意：
+// LocalHeap/Safepoint机制主要约束的是参与相应堆访问协议的线程，而非V8的全体后台线程！
+// 例如V8中的GCWorker线程，本身就需要在GC期间读写虚拟机堆，因此它们显然不需要受该机制
+// 管控，不需要向其他线程那样在V8主线程进入safepoint之后停下来。
 class V8_EXPORT_PRIVATE LocalHeap {
  public:
   using GCEpilogueCallback = void(void*);
