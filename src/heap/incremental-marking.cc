@@ -334,6 +334,7 @@ void IncrementalMarking::StartMarkingMajor() {
 
   StartBlackAllocation();
 
+  // 在V8主线程完成对GC Root的标记
   {
     TRACE_GC(heap()->tracer(), GCTracer::Scope::MC_MARK_ROOTS);
     MarkRoots();

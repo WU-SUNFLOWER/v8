@@ -1990,6 +1990,8 @@ void Heap::StartIncrementalMarking(GCFlags gc_flags,
     CompleteSweepingFull();
   }
 
+  // 增量标记启动阶段，因为涉及到对GC Roots进行标记、
+  // 遍历LocalHeap链表等操作，需要首先进入安全点。
   base::Optional<SafepointScope> safepoint_scope;
 
   {
