@@ -217,6 +217,11 @@ bool LocalHeap::IsRunning() const {
 
 void LocalHeap::ParkSlowPath() {
   while (true) {
+    // 如果当前线程在正常运行状态（无收到safepoint request通知），
+    // 那么原子地更新自己的状态为parked即可；否则拿到当前线程的实际
+    // 状态值，继续向下判断和处理。
+    // 注意这里用的是更重的CompareExchangeStrong，而不是LocalHeap::Park()
+    // 当中的CompareExchangeWeak，因此不会有假失败。
     ThreadState current_state = ThreadState::Running();
     if (state_.CompareExchangeStrong(current_state, ThreadState::Parked()))
       return;
@@ -253,14 +258,18 @@ void LocalHeap::ParkSlowPath() {
         }
       }
     } else {
+      // 对于V8后台线程，如果上边的CAS操作失败，
+      // 说明已经收到了safepoint request通知。
       DCHECK(current_state.IsSafepointRequested());
       DCHECK(!current_state.IsCollectionRequested());
 
+      // 将自己的parked标志位置为true
       ThreadState old_state = state_.SetParked();
       CHECK(old_state.IsRunning());
       CHECK(old_state.IsSafepointRequested());
       CHECK(!old_state.IsCollectionRequested());
 
+      // 主动通知主线程，自己已经进入parked状态了
       heap_->safepoint()->NotifyPark();
       return;
     }
@@ -269,6 +278,7 @@ void LocalHeap::ParkSlowPath() {
 
 void LocalHeap::UnparkSlowPath() {
   while (true) {
+    // 和LocalHeap::ParkSlowPath()中对称的设计，不再赘述。
     ThreadState current_state = ThreadState::Parked();
     if (state_.CompareExchangeStrong(current_state, ThreadState::Running()))
       return;
@@ -299,6 +309,8 @@ void LocalHeap::UnparkSlowPath() {
         return;
       }
     } else {
+      // 对于后台线程，如果收到了safepoint request通知，
+      // 就需要就地阻塞、等待V8主线程唤醒。
       DCHECK(current_state.IsSafepointRequested());
       DCHECK(!current_state.IsCollectionRequested());
 
@@ -345,7 +357,7 @@ void LocalHeap::SafepointSlowPath() {
   } else {
     DCHECK(current_state.IsSafepointRequested());
     DCHECK(!current_state.IsCollectionRequested());
-
+    // 让当前线程在安全点处睡下
     SleepInSafepoint();
   }
 }
@@ -367,6 +379,7 @@ void LocalHeap::SleepInSafepoint() {
   ExecuteWithStackMarkerIfNeeded([this]() {
     // Parking the running thread here is an optimization. We do not need to
     // wake this thread up to reach the next safepoint.
+    // 将当前线程的状态原子地置为Parked
     ThreadState old_state = state_.SetParked();
     CHECK(old_state.IsRunning());
     CHECK(old_state.IsSafepointRequested());

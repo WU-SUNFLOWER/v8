@@ -336,13 +336,15 @@ class V8_EXPORT_PRIVATE LocalHeap {
   template <typename Callback>
   V8_INLINE void ExecuteWithStackMarkerIfNeeded(Callback callback);
 
+  // 后台线程主动将自己设置为parked状态
   void Park() {
     DCHECK(AllowSafepoints::IsAllowed());
     DCHECK_IMPLIES(IsMainThreadOfClientIsolate(), is_in_trampoline());
     ThreadState expected = ThreadState::Running();
-    // 如果原先当前线程一直在正常运行状态（ThreadState中3个位字段均为0），
-    // 那么只需将其状态重新设置为(ParkedBit=1)即可。
-    // 如果原先当前线程已处于其他状态，那么进入慢速路径进一步处理。
+    // （1）如果原先当前线程一直在正常运行状态（ThreadState中3个位字段均为0），
+    //      么只需将其状态重新设置为(ParkedBit=1)即可。
+    // （2）如果原先当前线程已处于其他状态（例如已被V8主线程通知、要求进入安全点），
+    //      那么进入慢速路径进一步处理（可能会涉及到主动通知V8主线程）。
     if (!state_.CompareExchangeWeak(expected, ThreadState::Parked())) {
       ParkSlowPath();
     }
@@ -351,6 +353,10 @@ class V8_EXPORT_PRIVATE LocalHeap {
   void Unpark() {
     DCHECK(AllowSafepoints::IsAllowed());
     ThreadState expected = ThreadState::Parked();
+    // 如果当前线程只是处于纯粹的parked状态（期间没有收到过V8主线程的safepoint
+    // request通知）， 那么原子地更新state_即可，非常地轻量。
+    // 否则需要进入UnparkSlowPath()进一步处理。因为如果V8主线程已进入safepoint，当前线程可能就
+    // 需要就地阻塞、等待主线程唤醒。
     if (!state_.CompareExchangeWeak(expected, ThreadState::Running())) {
       UnparkSlowPath();
     }
