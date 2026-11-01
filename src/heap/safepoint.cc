@@ -34,6 +34,7 @@ void IsolateSafepoint::EnterLocalSafepointScope() {
   DCHECK(AllowGarbageCollection::IsAllowed());
 
   LockMutex(isolate()->main_thread_local_heap());
+  // 如果嵌套使用IsolateSafepointScope，只计数不重入
   if (++active_safepoint_scopes_ > 1) return;
 
   // Local safepoint can only be initiated on the isolate's main thread.
@@ -42,6 +43,7 @@ void IsolateSafepoint::EnterLocalSafepointScope() {
   TimedHistogramScope timer(isolate()->counters()->gc_time_to_safepoint());
   TRACE_GC(heap_->tracer(), GCTracer::Scope::TIME_TO_SAFEPOINT);
 
+  // 激活线程同步屏障
   barrier_.Arm();
   // 统计并通知当前Isolate名下除了V8主线程之外的其他线程，要求它们进入安全点
   size_t running = SetSafepointRequestedFlags(IncludeMainThread::kNo);
@@ -147,10 +149,16 @@ size_t IsolateSafepoint::SetSafepointRequestedFlags(
     // 原子地为后台线程的ThreadState设置SafepointRequested标记位，
     // 向后台线程发送要求进入安全点的通知；同时拿到该后台线程旧的
     // ThreadState状态。
+    // 注意，这里即使后台线程的状态不为running（比如已经parked了），
+    // 也要向它发送通知。因为稍后该线程可能会解除parked状态，而这时V8
+    // 主线程还处于safepoint当中（比如还在做GC）。
     const LocalHeap::ThreadState old_state =
         local_heap->state_.SetSafepointRequested();
 
-    // 如果这个线程之前处于正常运行状态，一会儿V8主线程就要等待它进入安全点
+    // 如果这个线程之前处于正常运行状态（即非parked），就统计下来；
+    // 一会儿V8主线程就要等待它进入安全点。
+    // 注意，对于V8主线程发起safepoint request之前已经进入parked
+    // 状态的那些后台线程，主线程是直接不需要进行统计和等待的！
     if (old_state.IsRunning()) running++;
     CHECK_IMPLIES(old_state.IsCollectionRequested(),
                   local_heap->is_main_thread());
@@ -181,6 +189,7 @@ void IsolateSafepoint::LeaveLocalSafepointScope() {
   local_heaps_mutex_.AssertHeld();
   DCHECK_GT(active_safepoint_scopes_, 0);
 
+  // 当所有IsolateSafepointScope均退出后，撤销激活Barrier并通知所有睡眠等待的后台线程
   if (--active_safepoint_scopes_ == 0) {
     ClearSafepointRequestedFlags(IncludeMainThread::kNo);
     barrier_.Disarm();
@@ -219,6 +228,7 @@ void IsolateSafepoint::WaitUntilRunningThreadsInSafepoint(
   barrier_.WaitUntilRunningThreadsInSafepoint(client_data->running());
 }
 
+// 激活安全点机制的线程同步屏障
 void IsolateSafepoint::Barrier::Arm() {
   base::MutexGuard guard(&mutex_);
   DCHECK(!IsArmed());
@@ -226,6 +236,7 @@ void IsolateSafepoint::Barrier::Arm() {
   stopped_ = 0;
 }
 
+// 撤销激活安全点机制的线程同步屏障，**并唤醒全体后台线程、通知主线程已退出safepoint**
 void IsolateSafepoint::Barrier::Disarm() {
   base::MutexGuard guard(&mutex_);
   DCHECK(IsArmed());
@@ -245,7 +256,12 @@ void IsolateSafepoint::Barrier::WaitUntilRunningThreadsInSafepoint(
   DCHECK_EQ(stopped_, running);
 }
 
-// V8 后台线程通过条件变量，通知 V8 主线程自己已进入安全点
+// V8 后台线程通过条件变量，主动通知 V8 主线程自己已进入安全点。
+//
+// 前提：
+// 线程接下来要做的工作并不涉及对虚拟机堆的读写，因此不需要主动睡眠。
+//
+// 这个方法会由LocalHeap::Park()最终触发。
 void IsolateSafepoint::Barrier::NotifyPark() {
   base::MutexGuard guard(&mutex_);
   CHECK(IsArmed());
@@ -253,24 +269,41 @@ void IsolateSafepoint::Barrier::NotifyPark() {
   cv_stopped_.NotifyOne();
 }
 
+// V8 后台线程通过条件变量，主动通知V8主线程自己已经停止、主动进入
+// 阻塞休眠状态。
+//
+// 前提：
+// 线程接下来的工作可能还会涉及对虚拟机堆的读写，因此事先主动调用了
+// LocalHeap::Safepoint()进行检查。经过检查，发现主线程已经下发
+// safepoint request，因此主动更新自己的状态、停止执行并通知V8主线程。
+//
+// 注意区分这个方法和上面Barrier::NotifyPark()语义的差异。
 void IsolateSafepoint::Barrier::WaitInSafepoint() {
   const auto scoped_blocking_call =
       V8::GetCurrentPlatform()->CreateBlockingScope(BlockingType::kWillBlock);
   base::MutexGuard guard(&mutex_);
   CHECK(IsArmed());
+  // 通知V8主线程自己已经停止（已进入安全点）。
+  // V8主线程检查是否所有后台线程均已进入安全点的逻辑，
+  // 见Barrier::WaitUntilRunningThreadsInSafepoint()。
   stopped_++;
   cv_stopped_.NotifyOne();
-
+  // 在条件变量cv_resume_上睡下，直到V8主线程退出安全点、
+  // 接触激活Barrier，后台线程才恢复执行。
   while (IsArmed()) {
     cv_resume_.Wait(&mutex_);
   }
 }
 
+// V8后台线程在主动解除parked状态（意味着接下来如果线程继续执行、可能会读写
+// 虚拟机堆）时，发现之前主线程已通知过自己safepoint request了，那么就需要
+// 就地阻塞睡眠，直到主线程退出safepoint。
 void IsolateSafepoint::Barrier::WaitInUnpark() {
   const auto scoped_blocking_call =
       V8::GetCurrentPlatform()->CreateBlockingScope(BlockingType::kWillBlock);
   base::MutexGuard guard(&mutex_);
-
+  // 在条件变量cv_resume_上睡下，直到V8主线程退出安全点、
+  // 接触激活Barrier，后台线程才恢复执行。
   while (IsArmed()) {
     cv_resume_.Wait(&mutex_);
   }

@@ -44,12 +44,21 @@ class IsolateSafepoint final {
   V8_EXPORT_PRIVATE void AssertMainThreadIsOnlyThread();
 
  private:
+  // V8安全点机制配套的线程同步屏障，职责是配合V8的安全点机制实现：
+  // （1）主线程进入安全点前、等待全体后台线程parked；
+  // （2）主线程退出安全点后，通知全体后台线程unparked。
   class Barrier {
+    // 用来保护armed_、stopped_内部数据的锁，线程等待条件变量的时候要释放掉
     base::Mutex mutex_;
+    // V8各个后台线程会通过cv_resume_条件变量等待V8主线程通知unparked
     base::ConditionVariable cv_resume_;
+    // V8主线程通过cv_stopped_条件变量等待之前正在running的后台线程全部parked
     base::ConditionVariable cv_stopped_;
+    // armed_表示线程同步屏障是否激活。V8主线程进入安全点前，
+    // 需要激活Barrier；退出安全点后，需要撤销激活Barrier。
     bool armed_;
 
+    // 每次Barrier激活后，之前正在running、现在已经进入parked状态的后台线程数
     size_t stopped_ = 0;
 
     bool IsArmed() { return armed_; }
