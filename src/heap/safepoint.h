@@ -32,7 +32,7 @@ class IsolateSafepoint final {
   // Iterate local heaps
   template <typename Callback>
   void IterateLocalHeaps(Callback callback) {
-    AssertActive();
+    AssertActive();  // 只有在LocalHeap链表被锁住的前提下，才能遍历它
     for (LocalHeap* current = local_heaps_head_; current;
          current = current->next_) {
       callback(current);

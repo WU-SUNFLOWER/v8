@@ -385,10 +385,16 @@ void LocalHeap::SleepInSafepoint() {
     CHECK(old_state.IsSafepointRequested());
     CHECK_IMPLIES(old_state.IsCollectionRequested(), is_main_thread());
 
+    // 最终会走到Barrier::WaitInSafepoint()，当前线程睡下并等待主线程退出safepoint后唤醒自己。
     heap_->safepoint()->WaitInSafepoint();
 
     base::Optional<IgnoreLocalGCRequests> ignore_gc_requests;
     if (is_main_thread()) ignore_gc_requests.emplace(heap());
+    // 清除掉自己的parked状态
+    // 注意：
+    // 因为在后台线程被唤醒前，在IsolateSafepoint::LeaveLocalSafepointScope()
+    // 当中已经清理掉safepoint request状态标记位了，因此在这里不会进入
+    // UnparkSlowPath()慢速路径！
     Unpark();
   });
 }

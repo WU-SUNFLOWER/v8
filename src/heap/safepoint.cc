@@ -33,7 +33,16 @@ void IsolateSafepoint::EnterLocalSafepointScope() {
   DCHECK_NULL(LocalHeap::Current());
   DCHECK(AllowGarbageCollection::IsAllowed());
 
+  // 锁住 LocalHeap 注册链表。
+  // 目的：
+  // （1）主线程接下来知道当前到底有哪些LocalHeap
+  //     （即有哪些后台线程），然后给它们发safepoint request通知。
+  //      如果遍历 LocalHeap 的同时，其他线程还能够随意注册、注销LocalHeap，
+  //      那么主线程就无法准确知道应该等待哪些线程。
+  // （2）在进入安全点后，V8需要保证LocalHeap链表本身不能被随意修改（例如GC
+  //      工作时可能需要遍历该链表），所以需要持续锁住它，直至V8主线程退出安全点。
   LockMutex(isolate()->main_thread_local_heap());
+
   // 如果嵌套使用IsolateSafepointScope，只计数不重入
   if (++active_safepoint_scopes_ > 1) return;
 
@@ -189,12 +198,15 @@ void IsolateSafepoint::LeaveLocalSafepointScope() {
   local_heaps_mutex_.AssertHeld();
   DCHECK_GT(active_safepoint_scopes_, 0);
 
-  // 当所有IsolateSafepointScope均退出后，撤销激活Barrier并通知所有睡眠等待的后台线程
+  // 当所有IsolateSafepointScope均退出后
   if (--active_safepoint_scopes_ == 0) {
+    // 预先清理各个线程的safepoint request状态标记位
     ClearSafepointRequestedFlags(IncludeMainThread::kNo);
+    // 再撤销激活Barrier并通知所有睡眠等待的后台线程
     barrier_.Disarm();
   }
 
+  // 解锁LocalHeap注册链表
   local_heaps_mutex_.Unlock();
 }
 
@@ -309,10 +321,14 @@ void IsolateSafepoint::Barrier::WaitInUnpark() {
   }
 }
 
+// IsolateSafepoint会在Heap::IterateRoots()中作为一种GC Root被访问
 void IsolateSafepoint::Iterate(RootVisitor* visitor) {
-  AssertActive();
+  AssertActive();  // 只有在LocalHeap链表被锁住的前提下，才能遍历它
   for (LocalHeap* current = local_heaps_head_; current;
        current = current->next_) {
+    // V8 GC在执行扫描前，主线程会首先进入safepoint并确保所有后台线程
+    // 处于parked状态；因此这里不带任何同步措施，直接遍历扫描是不会有
+    // 线程问题的！
     current->handles()->Iterate(visitor);
   }
 }
@@ -463,6 +479,9 @@ GlobalSafepointScope::~GlobalSafepointScope() {
 }
 
 SafepointScope::SafepointScope(Isolate* initiator, SafepointKind kind) {
+  // 就地创建一个IsolateSafepointScope或者GlobalSafepointScope实例，
+  // 之后在其构造函数中会执行进入安全点流程、在其析构函数中会执行退出
+  // 安全点流程。
   if (kind == SafepointKind::kIsolate) {
     isolate_safepoint_.emplace(initiator->heap());
   } else {
