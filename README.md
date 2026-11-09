@@ -1,9 +1,11 @@
 # Chromium V8 源码研究与调试实践
 
-本仓库基于 Google V8 JavaScript 引擎开源项目，用于个人源码阅读、调试实验与机制研究。
+本仓库基于 **Google V8 JavaScript 引擎**开源项目，用于**个人源码阅读、调试实验与机制研究**。
 
 - **研究版本：** V8 12.0.267.10（发布于 2023 年 12 月，Chromium M120 中搭载）
 - **研究时间：** 2026.06—至今（[提交记录](https://github.com/WU-SUNFLOWER/v8/commits/my-v8-12.0.267.10-study/)）
+
+## 1. 研究方法
 
 我的主要研究方法包括：
   - 静态阅读 V8 源码
@@ -14,11 +16,11 @@
   - 使用 ChatGPT 辅助，将自己的理解心得整理成专题笔记（见 [`docs`](docs/)）
     - 部分专题笔记参考了更新版本的 V8 主线源码，具体以各笔记中的版本说明为准。
 
-本仓库中的所有源码批注和文档笔记，仅代表个人研究、学习和实验验证所得到的理解。
+> 本仓库中的所有源码批注和文档笔记，仅代表个人研究、学习和实验验证所得到的理解。
 
-## 1. 现有主要研究内容
+## 2. 现有主要研究内容
 
-### 1.1. JavaScript 对象模型与属性访问
+### 2.1. JavaScript 对象模型与属性访问
 
 研究 JSObject、Map/Hidden Class、属性转换、Inline Cache 和原型链失效机制。
 
@@ -26,7 +28,7 @@
 - 实验脚本：[`learn_v8/map/`](learn_v8/map/)、[`learn_v8/prototype/`](learn_v8/prototype/)
 - 研究笔记：[`docs/object/`](docs/object/)
 
-### 1.2. 虚拟机堆、GC 与线程协作
+### 2.2. 虚拟机堆、GC 与线程协作
 
 研究 V8 虚拟机堆、Scavenge GC、增量/并发标记、写屏障以及 LocalHeap/Safepoint 等机制。
 
@@ -34,7 +36,7 @@
 - 研究笔记：[`docs/heap/`](docs/heap/)、[`docs/gc/`](docs/gc/)
 - 实验脚本：[`learn_v8/gc/`](learn_v8/gc)
 
-## 2. 调试工具扩展
+## 3. 调试工具扩展
 
 为便于源码研究和调试，现阶段我为 V8 补充了若干 Runtime Intrinsics。
 
